@@ -156,7 +156,7 @@ export default function AdminPage() {
   const loadProperties = async () => {
     setIsPropertiesLoading(true);
     try {
-      const allProperties = await base44.entities.Property.list({}, '-created_date', 100); // Fetch up to 100 properties
+      const allProperties = await base44.entities.Property.list('-created_date', 100); // Fetch up to 100 properties
       setPropertiesList(allProperties);
     } catch (error) {
       console.error("Failed to load properties:", error);

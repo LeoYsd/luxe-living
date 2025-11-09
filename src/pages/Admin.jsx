@@ -27,10 +27,22 @@ import {
   Play,
   MessageSquare,
   Send,
-  Loader2
+  Loader2,
+  Edit,
+  List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminPage() {
   const [user, setUser] = useState(null);
@@ -88,6 +100,14 @@ export default function AdminPage() {
   const [mcpLoading, setMcpLoading] = useState(false);
   const [mcpResult, setMcpResult] = useState(null);
 
+  // NEW: Property Management State
+  const [propertiesList, setPropertiesList] = useState([]);
+  const [isPropertiesLoading, setIsPropertiesLoading] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [deletingPropertyId, setDeletingPropertyId] = useState(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState(null);
+
 
   useEffect(() => {
     checkAdminAccess();
@@ -96,6 +116,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (isAuthorized) {
         loadSupportTickets();
+        loadProperties();
     }
   }, [isAuthorized]);
 
@@ -129,6 +150,71 @@ export default function AdminPage() {
         alert("Failed to load support tickets.");
     }
     setIsLoadingTickets(false);
+  };
+
+  // NEW: Load Properties Function
+  const loadProperties = async () => {
+    setIsPropertiesLoading(true);
+    try {
+      const allProperties = await base44.entities.Property.list({}, '-created_date', 100); // Fetch up to 100 properties
+      setPropertiesList(allProperties);
+    } catch (error) {
+      console.error("Failed to load properties:", error);
+      alert("Failed to load properties.");
+    }
+    setIsPropertiesLoading(false);
+  };
+
+  // NEW: Handle Edit Property
+  const handleEditProperty = (property) => {
+    setEditingProperty(property);
+    setPropertyFormData({
+      title: property.title || '',
+      description: property.description || '',
+      city: property.location?.city || '',
+      country: property.location?.country || '',
+      address: property.location?.address || '',
+      price_per_night: property.price_per_night || '',
+      currency: property.currency || 'USD',
+      max_guests: property.max_guests || '',
+      bedrooms: property.bedrooms || '',
+      bathrooms: property.bathrooms || '',
+      property_type: property.property_type || 'apartment',
+      amenities: property.amenities ? property.amenities.join(', ') : '',
+      images: property.images || [],
+      videos: property.videos || [],
+      rating: property.rating || '',
+      reviews_count: property.reviews_count || '',
+      host_name: property.host_name || '',
+      instant_book: property.instant_book || false
+    });
+    setShowPropertyForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to the form
+  };
+
+  // NEW: Handle Delete Click
+  const handleDeleteClick = (property) => {
+    setPropertyToDelete(property);
+    setShowDeleteDialog(true);
+  };
+
+  // NEW: Confirm Delete Property
+  const handleConfirmDelete = async () => {
+    if (!propertyToDelete) return;
+
+    setDeletingPropertyId(propertyToDelete.id);
+    try {
+      await base44.entities.Property.delete(propertyToDelete.id);
+      await loadProperties();
+      alert('Property deleted successfully!');
+    } catch (error) {
+      console.error("Failed to delete property:", error);
+      alert("Failed to delete property. Please try again.");
+    } finally {
+      setDeletingPropertyId(null);
+      setShowDeleteDialog(false);
+      setPropertyToDelete(null);
+    }
   };
 
   const handleSelectTicket = async (ticket) => {
@@ -325,6 +411,7 @@ export default function AdminPage() {
 
       setImportResults(results);
       setExtractedData(null); // Clear extracted data after import
+      await loadProperties(); // Refresh the property list
     } catch (error) {
       console.error('Error importing properties:', error);
       alert('Error during import process.');
@@ -377,22 +464,30 @@ export default function AdminPage() {
         reviews_count: Number(propertyFormData.reviews_count) || 0,
         host_name: propertyFormData.host_name || '',
         instant_book: propertyFormData.instant_book,
-        source: 'manual'
+        source: editingProperty ? editingProperty.source : 'manual'
       };
 
-      await base44.entities.Property.create(propertyData);
+      if (editingProperty) {
+        // Update existing property
+        await base44.entities.Property.update(editingProperty.id, propertyData);
+        alert('Property updated successfully!');
+      } else {
+        // Create new property
+        await base44.entities.Property.create(propertyData);
+        alert('Property added successfully!');
+      }
       
       // Reset form
       setPropertyFormData({
         title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
       });
-
-      alert('Property added successfully!');
+      setEditingProperty(null); // Clear editing state
       setShowPropertyForm(false);
+      await loadProperties(); // Refresh the property list
       
     } catch (error) {
-      console.error('Error adding property:', error);
-      alert('Failed to add property. Please try again.');
+      console.error('Error saving property:', error);
+      alert('Failed to save property. Please try again.');
     }
     
     setIsSubmittingForm(false);
@@ -510,6 +605,7 @@ export default function AdminPage() {
         }
 
         alert(`Success! ${count} properties have been deleted.`);
+        await loadProperties(); // Refresh the property list
       } catch (error) {
         console.error('Failed to delete properties:', error);
         alert(`Error: ${error.message}`);
@@ -542,6 +638,10 @@ export default function AdminPage() {
         message: response.data.message || (response.data.success ? 'Properties fetched successfully!' : 'Failed to fetch properties.'),
         errors: response.data.errors || []
       });
+      
+      if (response.data.success) {
+        await loadProperties(); // Refresh the property list after successful fetch
+      }
     } catch (error) {
       console.error('MCP Error:', error);
       setMcpResult({ 
@@ -727,15 +827,16 @@ export default function AdminPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Manual Property Entry
+                {editingProperty ? 'Edit Property' : 'Manual Property Entry'}
               </CardTitle>
               <Button
                 onClick={() => {
                   setShowPropertyForm(!showPropertyForm);
-                  if (showPropertyForm) {
+                  if (showPropertyForm) { // If closing the form, clear data and editing state
                     setPropertyFormData({
                       title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
                     });
+                    setEditingProperty(null);
                   }
                 }}
                 variant={showPropertyForm ? "outline" : "default"}
@@ -755,6 +856,13 @@ export default function AdminPage() {
               transition={{ duration: 0.3 }}
             >
               <CardContent>
+                {editingProperty && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+                    <p className="text-sm text-blue-900">
+                      <strong>Editing:</strong> {editingProperty.title}
+                    </p>
+                  </div>
+                )}
                 <form onSubmit={handlePropertyFormSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1085,7 +1193,13 @@ export default function AdminPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setShowPropertyForm(false)}
+                      onClick={() => {
+                        setShowPropertyForm(false);
+                        setEditingProperty(null); // Clear editing state on cancel
+                        setPropertyFormData({ // Reset form data
+                          title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
+                        });
+                      }}
                       disabled={isSubmittingForm}
                     >
                       Cancel
@@ -1098,10 +1212,10 @@ export default function AdminPage() {
                       {isSubmittingForm ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2" />
-                          Adding Property...
+                          {editingProperty ? 'Updating...' : 'Adding Property...'}
                         </>
                       ) : (
-                        'Add Property'
+                        editingProperty ? 'Update Property' : 'Add Property'
                       )}
                     </Button>
                   </div>
@@ -1111,6 +1225,155 @@ export default function AdminPage() {
           )}
           </AnimatePresence>
         </Card>
+
+        {/* NEW: Property Management List */}
+        <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <List className="w-5 h-5" />
+                Property Management ({propertiesList.length} properties)
+              </CardTitle>
+              <Button
+                onClick={loadProperties}
+                disabled={isPropertiesLoading}
+                variant="outline"
+                size="sm"
+              >
+                {isPropertiesLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Refresh List'
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isPropertiesLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-slate-400" />
+                <p className="text-slate-500">Loading properties...</p>
+              </div>
+            ) : propertiesList.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <Database className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                <p>No properties found.</p>
+                <p className="text-sm mt-2">Add properties using the forms above or refresh the list.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b-2 border-slate-200">
+                    <tr>
+                      <th className="text-left p-3 font-semibold text-slate-700">Title</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Location</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Price/Night</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Type</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Rating</th>
+                      <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {propertiesList.map((property) => (
+                      <tr key={property.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                        <td className="p-3 font-medium text-slate-900 max-w-xs truncate">
+                          {property.title}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {property.location?.city}, {property.location?.country}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {property.currency === 'NGN' ? '₦' : '$'}{property.price_per_night?.toLocaleString()}
+                        </td>
+                        <td className="p-3">
+                          <Badge variant="outline" className="capitalize">
+                            {property.property_type}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {property.rating ? (
+                            <div className="flex items-center gap-1">
+                              <span>⭐</span>
+                              <span>{property.rating}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">N/A</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              onClick={() => handleEditProperty(property)}
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 hover:bg-blue-50 border-blue-200"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteClick(property)}
+                              variant="outline"
+                              size="sm"
+                              disabled={deletingPropertyId === property.id}
+                              className="text-red-600 hover:bg-red-50 border-red-200"
+                            >
+                              {deletingPropertyId === property.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Delete
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Property</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this property?
+                {propertyToDelete && (
+                  <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                    <p className="font-semibold text-slate-900">{propertyToDelete.title}</p>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {propertyToDelete.location?.city}, {propertyToDelete.location?.country}
+                    </p>
+                  </div>
+                )}
+                <p className="mt-3 text-red-600 font-semibold">
+                  This action cannot be undone.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setShowDeleteDialog(false);
+                setPropertyToDelete(null);
+              }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete Property
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Support Inbox Section */}
         <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">

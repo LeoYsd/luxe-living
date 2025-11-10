@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User } from '@/entities/User';
 import { UploadFile } from '@/integrations/Core';
@@ -73,7 +72,7 @@ export default function AdminPage() {
     address: '',
     price_per_night: '',
     currency: 'USD',
-    caution_fee: '', // ADDED
+    caution_fee: '',
     max_guests: '',
     bedrooms: '',
     bathrooms: '',
@@ -177,7 +176,7 @@ export default function AdminPage() {
       address: property.location?.address || '',
       price_per_night: property.price_per_night || '',
       currency: property.currency || 'USD',
-      caution_fee: property.caution_fee || '', // ADDED
+      caution_fee: property.caution_fee || '',
       max_guests: property.max_guests || '',
       bedrooms: property.bedrooms || '',
       bathrooms: property.bathrooms || '',
@@ -322,7 +321,7 @@ export default function AdminPage() {
             country: { type: "string" },
             address: { type: "string" },
             price_per_night: { type: "number" },
-            caution_fee: { type: "number" }, // ADDED
+            caution_fee: { type: "number" },
             max_guests: { type: "number" },
             bedrooms: { type: "number" },
             bathrooms: { type: "number" },
@@ -360,7 +359,7 @@ export default function AdminPage() {
           },
           price_per_night: Number(item.price_per_night),
           currency: 'USD', // Explicitly set to USD for file imports
-          caution_fee: Number(item.caution_fee) || 0, // ADDED
+          caution_fee: Number(item.caution_fee) || 0,
           max_guests: Number(item.max_guests),
           bedrooms: Number(item.bedrooms) || 1,
           bathrooms: Number(item.bathrooms) || 1,
@@ -457,7 +456,7 @@ export default function AdminPage() {
         },
         price_per_night: Number(propertyFormData.price_per_night),
         currency: propertyFormData.currency, // Use selected currency
-        caution_fee: Number(propertyFormData.caution_fee) || 0, // ADDED
+        caution_fee: Number(propertyFormData.caution_fee) || 0,
         max_guests: Number(propertyFormData.max_guests),
         bedrooms: Number(propertyFormData.bedrooms) || 1,
         bathrooms: Number(propertyFormData.bathrooms) || 1,
@@ -1290,7 +1289,7 @@ export default function AdminPage() {
                       <th className="text-left p-3 font-semibold text-slate-700">Title</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Location</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Price/Night</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Caution Fee</th> {/* ADDED */}
+                      <th className="text-left p-3 font-semibold text-slate-700">Caution Fee</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Type</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Rating</th>
                       <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
@@ -1598,10 +1597,11 @@ export default function AdminPage() {
                   <div>
                     <p className="font-semibold text-green-900">{uploadedFile.name}</p>
                     <p className="text-sm text-green-700">
-                      Size: ${(uploadedFile.size / 1024).toFixed(2)} KB
+                      Size: {(uploadedFile.size / 1024).toFixed(2)} KB
                     </p>
                   </div>
-                </motion.div>
+                </div>
+              </motion.div>
             )}
 
             {uploadedFile && !extractedData && (

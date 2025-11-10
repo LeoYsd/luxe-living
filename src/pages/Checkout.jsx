@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, MapPin, Users, ArrowLeft, CheckCircle, Loader2, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowLeft, CheckCircle, Loader2, Clock, AlertCircle, Shield } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -296,8 +297,9 @@ export default function CheckoutPage() {
       
       if (nightCount > 0 && property) {
         const subtotal = property.price_per_night * nightCount;
-        const serviceFee = Math.round(subtotal * 0.1); 
-        const total = subtotal + serviceFee;
+        const serviceFee = Math.round(subtotal * 0.1);
+        const cautionFee = property.caution_fee || 0;
+        const total = subtotal + serviceFee + cautionFee;
         
         setTotalPrice(total);
       } else {
@@ -629,11 +631,25 @@ export default function CheckoutPage() {
                       <span>Service Fee (10%)</span>
                       <span>₦{Math.round(property.price_per_night * nights * 0.1).toLocaleString()}</span>
                     </div>
+                    {property.caution_fee > 0 && (
+                      <div className="flex justify-between items-center border-t border-slate-200 pt-2">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-amber-600" />
+                          <span className="text-amber-700 font-medium">Caution Fee (Refundable)</span>
+                        </div>
+                        <span className="text-amber-700 font-semibold">₦{property.caution_fee.toLocaleString()}</span>
+                      </div>
+                    )}
                     <hr className="border-slate-200" />
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
                       <span>₦{totalPrice.toLocaleString()}</span>
                     </div>
+                    {property.caution_fee > 0 && (
+                      <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded-lg">
+                        💡 The caution fee of ₦{property.caution_fee.toLocaleString()} will be fully refunded after checkout inspection
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -643,6 +659,11 @@ export default function CheckoutPage() {
                     <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 text-sm">
                       <p className="font-semibold mb-2 text-green-900">💳 Secure Payment with Paystack</p>
                       <p className="text-green-800">Fast, secure, and reliable payment processing for Nigerian users.</p>
+                      {property.caution_fee > 0 && (
+                        <p className="text-xs text-green-700 mt-2">
+                          Note: Caution fee is held securely and refunded after your stay.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

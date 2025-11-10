@@ -73,6 +73,7 @@ export default function AdminPage() {
     address: '',
     price_per_night: '',
     currency: 'USD',
+    caution_fee: '', // ADDED
     max_guests: '',
     bedrooms: '',
     bathrooms: '',
@@ -176,6 +177,7 @@ export default function AdminPage() {
       address: property.location?.address || '',
       price_per_night: property.price_per_night || '',
       currency: property.currency || 'USD',
+      caution_fee: property.caution_fee || '', // ADDED
       max_guests: property.max_guests || '',
       bedrooms: property.bedrooms || '',
       bathrooms: property.bathrooms || '',
@@ -320,6 +322,7 @@ export default function AdminPage() {
             country: { type: "string" },
             address: { type: "string" },
             price_per_night: { type: "number" },
+            caution_fee: { type: "number" }, // ADDED
             max_guests: { type: "number" },
             bedrooms: { type: "number" },
             bathrooms: { type: "number" },
@@ -357,6 +360,7 @@ export default function AdminPage() {
           },
           price_per_night: Number(item.price_per_night),
           currency: 'USD', // Explicitly set to USD for file imports
+          caution_fee: Number(item.caution_fee) || 0, // ADDED
           max_guests: Number(item.max_guests),
           bedrooms: Number(item.bedrooms) || 1,
           bathrooms: Number(item.bathrooms) || 1,
@@ -421,9 +425,9 @@ export default function AdminPage() {
   };
 
   const downloadSampleCSV = () => {
-    const sampleData = `title,description,city,country,address,price_per_night,max_guests,bedrooms,bathrooms,property_type,amenities,images,rating,reviews_count,host_name,instant_book
-"Luxury Downtown Apartment","Beautiful apartment in the heart of the city","Lagos","Nigeria","123 Main St",150,4,2,2,"apartment","wifi,kitchen,parking","https://example.com/image1.jpg",4.5,120,"John Doe",true
-"Cozy Beach Villa","Stunning villa with ocean views","Accra","Ghana","456 Beach Ave",350,6,3,3,"villa","wifi,pool,balcony","https://example.com/image2.jpg",4.8,85,"Jane Smith",false`;
+    const sampleData = `title,description,city,country,address,price_per_night,caution_fee,max_guests,bedrooms,bathrooms,property_type,amenities,images,rating,reviews_count,host_name,instant_book
+"Luxury Downtown Apartment","Beautiful apartment in the heart of the city","Lagos","Nigeria","123 Main St",150,50,4,2,2,"apartment","wifi,kitchen,parking","https://example.com/image1.jpg",4.5,120,"John Doe",true
+"Cozy Beach Villa","Stunning villa with ocean views","Accra","Ghana","456 Beach Ave",350,100,6,3,3,"villa","wifi,pool,balcony","https://example.com/image2.jpg",4.8,85,"Jane Smith",false`;
 
     const blob = new Blob([sampleData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -453,6 +457,7 @@ export default function AdminPage() {
         },
         price_per_night: Number(propertyFormData.price_per_night),
         currency: propertyFormData.currency, // Use selected currency
+        caution_fee: Number(propertyFormData.caution_fee) || 0, // ADDED
         max_guests: Number(propertyFormData.max_guests),
         bedrooms: Number(propertyFormData.bedrooms) || 1,
         bathrooms: Number(propertyFormData.bathrooms) || 1,
@@ -479,7 +484,7 @@ export default function AdminPage() {
       
       // Reset form
       setPropertyFormData({
-        title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
+        title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', caution_fee: '', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
       });
       setEditingProperty(null); // Clear editing state
       setShowPropertyForm(false);
@@ -834,7 +839,7 @@ export default function AdminPage() {
                   setShowPropertyForm(!showPropertyForm);
                   if (showPropertyForm) { // If closing the form, clear data and editing state
                     setPropertyFormData({
-                      title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
+                      title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', caution_fee: '', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
                     });
                     setEditingProperty(null);
                   }
@@ -988,6 +993,23 @@ export default function AdminPage() {
                     </div>
                     
                     <div>
+                      <Label htmlFor="caution_fee" className="text-sm font-semibold text-slate-700">
+                        Caution Fee (Refundable)
+                      </Label>
+                      <Input
+                        id="caution_fee"
+                        type="number"
+                        value={propertyFormData.caution_fee}
+                        onChange={(e) => handleFormInputChange('caution_fee', e.target.value)}
+                        placeholder="0"
+                        className="mt-2 rounded-xl border-slate-200"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Security deposit returned after checkout
+                      </p>
+                    </div>
+                    
+                    <div>
                       <Label htmlFor="max_guests" className="text-sm font-semibold text-slate-700">
                         Max Guests *
                       </Label>
@@ -1015,7 +1037,9 @@ export default function AdminPage() {
                         className="mt-2 rounded-xl border-slate-200"
                       />
                     </div>
-                    
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="bathrooms" className="text-sm font-semibold text-slate-700">
                         Bathrooms
@@ -1029,9 +1053,7 @@ export default function AdminPage() {
                         className="mt-2 rounded-xl border-slate-200"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
                     <div>
                       <Label htmlFor="rating" className="text-sm font-semibold text-slate-700">
                         Rating (0-5)
@@ -1197,7 +1219,7 @@ export default function AdminPage() {
                         setShowPropertyForm(false);
                         setEditingProperty(null); // Clear editing state on cancel
                         setPropertyFormData({ // Reset form data
-                          title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
+                          title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', caution_fee: '', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
                         });
                       }}
                       disabled={isSubmittingForm}
@@ -1268,6 +1290,7 @@ export default function AdminPage() {
                       <th className="text-left p-3 font-semibold text-slate-700">Title</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Location</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Price/Night</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Caution Fee</th> {/* ADDED */}
                       <th className="text-left p-3 font-semibold text-slate-700">Type</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Rating</th>
                       <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
@@ -1284,6 +1307,15 @@ export default function AdminPage() {
                         </td>
                         <td className="p-3 text-slate-600">
                           {property.currency === 'NGN' ? '₦' : '$'}{property.price_per_night?.toLocaleString()}
+                        </td>
+                        <td className="p-3 text-slate-600">
+                          {property.caution_fee ? (
+                            <span className="text-amber-600 font-medium">
+                              {property.currency === 'NGN' ? '₦' : '$'}{property.caution_fee?.toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">None</span>
+                          )}
                         </td>
                         <td className="p-3">
                           <Badge variant="outline" className="capitalize">
@@ -1569,8 +1601,7 @@ export default function AdminPage() {
                       Size: ${(uploadedFile.size / 1024).toFixed(2)} KB
                     </p>
                   </div>
-                </div>
-              </motion.div>
+                </motion.div>
             )}
 
             {uploadedFile && !extractedData && (

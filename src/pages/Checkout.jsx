@@ -297,9 +297,9 @@ export default function CheckoutPage() {
       
       if (nightCount > 0 && property) {
         const subtotal = property.price_per_night * nightCount;
-        const serviceFee = Math.round(subtotal * 0.1); 
-        const cautionFee = property.caution_fee || 0; // Added caution fee
-        const total = subtotal + serviceFee + cautionFee; // Included caution fee in total
+        const serviceFee = Math.round(subtotal * 0.025); // Changed from 0.1 to 0.025
+        const cautionFee = property.caution_fee || 0;
+        const total = subtotal + serviceFee + cautionFee;
         
         setTotalPrice(total);
       } else {
@@ -628,8 +628,8 @@ export default function CheckoutPage() {
                       <span>₦{(property.price_per_night * nights).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Service Fee (10%)</span>
-                      <span>₦{Math.round(property.price_per_night * nights * 0.1).toLocaleString()}</span>
+                      <span>Service Fee (2.5%)</span> {/* Changed from (10%) to (2.5%) */}
+                      <span>₦{Math.round(property.price_per_night * nights * 0.025).toLocaleString()}</span> {/* Changed from 0.1 to 0.025 */}
                     </div>
                     {property.caution_fee > 0 && (
                       <div className="flex justify-between items-center py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg">

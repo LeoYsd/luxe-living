@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, MapPin, Users, ArrowLeft, CheckCircle, Loader2, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowLeft, CheckCircle, Loader2, Clock, AlertCircle, Shield } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -297,7 +298,8 @@ export default function CheckoutPage() {
       if (nightCount > 0 && property) {
         const subtotal = property.price_per_night * nightCount;
         const serviceFee = Math.round(subtotal * 0.1); 
-        const total = subtotal + serviceFee;
+        const cautionFee = property.caution_fee || 0; // Added caution fee
+        const total = subtotal + serviceFee + cautionFee; // Included caution fee in total
         
         setTotalPrice(total);
       } else {
@@ -629,11 +631,25 @@ export default function CheckoutPage() {
                       <span>Service Fee (10%)</span>
                       <span>₦{Math.round(property.price_per_night * nights * 0.1).toLocaleString()}</span>
                     </div>
+                    {property.caution_fee > 0 && (
+                      <div className="flex justify-between items-center py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-900">Refundable Caution Fee</span>
+                        </div>
+                        <span className="font-semibold text-amber-900">₦{property.caution_fee.toLocaleString()}</span>
+                      </div>
+                    )}
                     <hr className="border-slate-200" />
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
                       <span>₦{totalPrice.toLocaleString()}</span>
                     </div>
+                    {property.caution_fee > 0 && (
+                      <p className="text-xs text-amber-700 mt-2">
+                        * Caution fee of ₦{property.caution_fee.toLocaleString()} will be fully refunded after checkout inspection
+                      </p>
+                    )}
                   </div>
                 )}
 

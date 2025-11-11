@@ -5,22 +5,15 @@ import { UploadFile } from '@/integrations/Core';
 import { SupportTicket } from '@/entities/SupportTicket';
 import { SupportMessage } from '@/entities/SupportMessage';
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
-  Upload,
-  FileText,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Download,
   Database,
   Shield,
-  Eye,
+  AlertTriangle,
   Image as ImageIcon,
   Trash2,
   Video,
@@ -29,7 +22,12 @@ import {
   Send,
   Loader2,
   Edit,
-  List
+  List,
+  Plus, // NEW
+  Settings, // NEW
+  DollarSign, // NEW
+  FileText, // Added for basic info section
+  XCircle // Added for clear edit button
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,17 +41,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // NEW Tabs components
 
 export default function AdminPage() {
   const [user, setUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [extractedData, setExtractedData] = useState(null);
-  const [importResults, setImportResults] = useState(null);
-  const [progress, setProgress] = useState(0);
+  // Removed old file upload/data ingestion states:
+  // const [uploadedFile, setUploadedFile] = useState(null);
+  // const [isUploading, setIsUploading] = useState(false);
+  // const [isProcessing, setIsProcessing] = useState(false);
+  // const [extractedData, setExtractedData] = useState(null);
+  // const [importResults, setImportResults] = useState(null);
+  // const [progress, setProgress] = useState(0);
 
   // Support Inbox State
   const [supportTickets, setSupportTickets] = useState([]);
@@ -63,36 +63,32 @@ export default function AdminPage() {
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
 
-  // New state for manual form entry
-  const [showPropertyForm, setShowPropertyForm] = useState(false);
+  // New state for manual form entry (updated structure)
   const [propertyFormData, setPropertyFormData] = useState({
     title: '',
     description: '',
-    city: '',
-    country: '',
-    address: '',
+    location: { city: '', country: '', address: '' }, // Changed to object
     price_per_night: '',
-    currency: 'USD',
+    caution_fee: '', // NEW
     max_guests: '',
     bedrooms: '',
     bathrooms: '',
     property_type: 'apartment',
-    amenities: '',
+    amenities: '', // Keeping as string for form input, will split on submit
     images: [],
     videos: [],
-    rating: '',
-    reviews_count: '',
     host_name: '',
     instant_book: false
   });
-  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [isSavingProperty, setIsSavingProperty] = useState(false); // Renamed from isSubmittingForm
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isUploadingVideos, setIsUploadingVideos] = useState(false);
 
   // New state for "Delete All Properties"
   const [isDeleting, setIsDeleting] = useState(false);
   
-  const [activeTab, setActiveTab] = useState('data-ingestion');
+  // Removed old activeTab for data ingestion
+  // const [activeTab, setActiveTab] = useState('data-ingestion');
   const [isSyncing, setIsSyncing] = useState(false);
 
   // NEW: MCP Data Fetch State
@@ -100,13 +96,16 @@ export default function AdminPage() {
   const [mcpLoading, setMcpLoading] = useState(false);
   const [mcpResult, setMcpResult] = useState(null);
 
-  // NEW: Property Management State
-  const [propertiesList, setPropertiesList] = useState([]);
-  const [isPropertiesLoading, setIsPropertiesLoading] = useState(false);
-  const [editingProperty, setEditingProperty] = useState(null);
+  // NEW: Property Management State (renamed from propertiesList, isPropertiesLoading, editingProperty)
+  const [properties, setProperties] = useState([]); // Renamed from propertiesList
+  const [isLoadingProperties, setIsLoadingProperties] = useState(false); // Renamed from isPropertiesLoading
+  const [editingPropertyId, setEditingPropertyId] = useState(null); // Changed to ID
   const [deletingPropertyId, setDeletingPropertyId] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState(null);
+
+  // State for the new Tabs component
+  const [activeAdminTab, setActiveAdminTab] = useState('add-manual'); // Default to manual entry tab
 
 
   useEffect(() => {
@@ -152,43 +151,39 @@ export default function AdminPage() {
     setIsLoadingTickets(false);
   };
 
-  // NEW: Load Properties Function
+  // NEW: Load Properties Function (updated to use new state names)
   const loadProperties = async () => {
-    setIsPropertiesLoading(true);
+    setIsLoadingProperties(true); // Renamed from isPropertiesLoading
     try {
       const allProperties = await base44.entities.Property.list('-created_date', 100); // Fetch up to 100 properties
-      setPropertiesList(allProperties);
+      setProperties(allProperties); // Renamed from setPropertiesList
     } catch (error) {
       console.error("Failed to load properties:", error);
       alert("Failed to load properties.");
     }
-    setIsPropertiesLoading(false);
+    setIsLoadingProperties(false); // Renamed from isPropertiesLoading
   };
 
-  // NEW: Handle Edit Property
+  // NEW: Handle Edit Property (updated to use new state names and structure)
   const handleEditProperty = (property) => {
-    setEditingProperty(property);
+    setEditingPropertyId(property.id); // Set the ID of the property being edited
     setPropertyFormData({
       title: property.title || '',
       description: property.description || '',
-      city: property.location?.city || '',
-      country: property.location?.country || '',
-      address: property.location?.address || '',
+      location: property.location || { city: '', country: '', address: '' }, // Ensure location is an object
       price_per_night: property.price_per_night || '',
-      currency: property.currency || 'USD',
+      caution_fee: property.caution_fee || '', // NEW
       max_guests: property.max_guests || '',
       bedrooms: property.bedrooms || '',
       bathrooms: property.bathrooms || '',
       property_type: property.property_type || 'apartment',
-      amenities: property.amenities ? property.amenities.join(', ') : '',
+      amenities: property.amenities ? property.amenities.join(', ') : '', // Convert array to string for form input
       images: property.images || [],
       videos: property.videos || [],
-      rating: property.rating || '',
-      reviews_count: property.reviews_count || '',
       host_name: property.host_name || '',
       instant_book: property.instant_book || false
     });
-    setShowPropertyForm(true);
+    setActiveAdminTab('add-manual'); // Switch to the "Add/Edit Property" tab
     window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to the form
   };
 
@@ -268,208 +263,48 @@ export default function AdminPage() {
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    if (!allowedTypes.includes(file.type) && !file.name.endsWith('.csv')) {
-      alert('Please upload a CSV or Excel file only.');
-      return;
-    }
-
-    setIsUploading(true);
-    setProgress(10);
-    setExtractedData(null); // Clear previous data
-    setImportResults(null); // Clear previous results
-
-    try {
-      const uploadResult = await UploadFile({ file });
-      setUploadedFile({
-        name: file.name,
-        size: file.size,
-        url: uploadResult.file_url
-      });
-      setProgress(100);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      alert('Failed to upload file. Please try again.');
-    }
-
-    setIsUploading(false);
-  };
-
-  const processUploadedFile = async () => {
-    if (!uploadedFile) return;
-
-    setIsProcessing(true);
-    setProgress(0);
-    setImportResults(null); // Clear previous results
-
-    try {
-      // Define the expected schema for property data
-      const propertySchema = {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            description: { type: "string" },
-            city: { type: "string" },
-            country: { type: "string" },
-            address: { type: "string" },
-            price_per_night: { type: "number" },
-            max_guests: { type: "number" },
-            bedrooms: { type: "number" },
-            bathrooms: { type: "number" },
-            property_type: { type: "string" },
-            amenities: { type: "string" }, // Comma-separated string
-            images: { type: "string" }, // Comma-separated URLs
-            rating: { type: "number" },
-            reviews_count: { type: "number" },
-            host_name: { type: "string" },
-            instant_book: { type: "boolean" }
-          },
-          required: ["title", "city", "country", "price_per_night", "max_guests", "property_type"]
-        }
-      };
-
-      setProgress(30);
-
-      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url: uploadedFile.url,
-        json_schema: propertySchema
-      });
-
-      setProgress(60);
-
-      if (extractResult.status === 'success') {
-        // Transform and validate the data
-        const transformedData = extractResult.output.map(item => ({
-          title: item.title,
-          description: item.description || '',
-          location: {
-            city: item.city,
-            country: item.country,
-            address: item.address || '',
-            coordinates: { lat: 0, lng: 0 } // Default coordinates
-          },
-          price_per_night: Number(item.price_per_night),
-          currency: 'USD', // Explicitly set to USD for file imports
-          max_guests: Number(item.max_guests),
-          bedrooms: Number(item.bedrooms) || 1,
-          bathrooms: Number(item.bathrooms) || 1,
-          property_type: item.property_type.toLowerCase(),
-          amenities: item.amenities ? item.amenities.split(',').map(a => a.trim().toLowerCase()) : [],
-          images: item.images ? item.images.split(',').map(url => url.trim()) : [],
-          rating: Number(item.rating) || 0,
-          reviews_count: Number(item.reviews_count) || 0,
-          host_name: item.host_name || '',
-          instant_book: Boolean(item.instant_book),
-          source: 'file_upload'
-        }));
-
-        setExtractedData(transformedData);
-        setProgress(100);
-      } else {
-        throw new Error(extractResult.details || 'Failed to extract data from file');
-      }
-    } catch (error) {
-      console.error('Error processing file:', error);
-      alert(`Error processing file: ${error.message}`);
-      setExtractedData(null); // Clear extracted data on error
-    }
-
-    setIsProcessing(false);
-  };
-
-  const importPropertiesToDatabase = async () => {
-    if (!extractedData || extractedData.length === 0) return;
-
-    setIsProcessing(true);
-    setProgress(0);
-
-    const results = {
-      successful: 0,
-      failed: 0,
-      errors: []
-    };
-
-    try {
-      for (let i = 0; i < extractedData.length; i++) {
-        try {
-          await base44.entities.Property.create(extractedData[i]);
-          results.successful++;
-        } catch (error) {
-          results.failed++;
-          results.errors.push(`Row ${i + 1}: ${error.message}`);
-        }
-
-        setProgress(((i + 1) / extractedData.length) * 100);
-      }
-
-      setImportResults(results);
-      setExtractedData(null); // Clear extracted data after import
-      await loadProperties(); // Refresh the property list
-    } catch (error) {
-      console.error('Error importing properties:', error);
-      alert('Error during import process.');
-    }
-
-    setIsProcessing(false);
-  };
-
-  const downloadSampleCSV = () => {
-    const sampleData = `title,description,city,country,address,price_per_night,max_guests,bedrooms,bathrooms,property_type,amenities,images,rating,reviews_count,host_name,instant_book
-"Luxury Downtown Apartment","Beautiful apartment in the heart of the city","Lagos","Nigeria","123 Main St",150,4,2,2,"apartment","wifi,kitchen,parking","https://example.com/image1.jpg",4.5,120,"John Doe",true
-"Cozy Beach Villa","Stunning villa with ocean views","Accra","Ghana","456 Beach Ave",350,6,3,3,"villa","wifi,pool,balcony","https://example.com/image2.jpg",4.8,85,"Jane Smith",false`;
-
-    const blob = new Blob([sampleData], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'property_data_sample.csv';
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    a.remove();
-  };
+  // Removed old file upload handlers:
+  // const handleFileUpload = async (event) => { /* ... */ };
+  // const processUploadedFile = async () => { /* ... */ };
+  // const importPropertiesToDatabase = async () => { /* ... */ };
+  // const downloadSampleCSV = () => { /* ... */ };
 
   const handlePropertyFormSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmittingForm(true);
+    setIsSavingProperty(true); // Renamed from isSubmittingForm
 
     try {
       // Transform form data to match Property entity structure
       const propertyData = {
         title: propertyFormData.title,
         description: propertyFormData.description,
-        location: {
-          city: propertyFormData.city,
-          country: propertyFormData.country,
-          address: propertyFormData.address,
+        location: { // Use propertyFormData.location directly
+          city: propertyFormData.location.city,
+          country: propertyFormData.location.country,
+          address: propertyFormData.location.address,
           coordinates: { lat: 0, lng: 0 } // Default coordinates
         },
-        price_per_night: Number(propertyFormData.price_per_night),
-        currency: propertyFormData.currency, // Use selected currency
-        max_guests: Number(propertyFormData.max_guests),
-        bedrooms: Number(propertyFormData.bedrooms) || 1,
-        bathrooms: Number(propertyFormData.bathrooms) || 1,
+        price_per_night: parseFloat(propertyFormData.price_per_night) || 0, // Ensure number
+        currency: 'NGN', // Explicitly set to NGN as per new pricing section in outline
+        caution_fee: parseFloat(propertyFormData.caution_fee) || 0, // NEW field
+        max_guests: parseInt(propertyFormData.max_guests) || 1, // Ensure number
+        bedrooms: parseInt(propertyFormData.bedrooms) || 1, // Ensure number
+        bathrooms: parseInt(propertyFormData.bathrooms) || 1, // Ensure number
         property_type: propertyFormData.property_type,
         amenities: propertyFormData.amenities ? propertyFormData.amenities.split(',').map(a => a.trim().toLowerCase()) : [],
         images: propertyFormData.images,
         videos: propertyFormData.videos,
-        rating: Number(propertyFormData.rating) || 0,
-        reviews_count: Number(propertyFormData.reviews_count) || 0,
+        rating: 0, // Removed from form, default to 0
+        reviews_count: 0, // Removed from form, default to 0
         host_name: propertyFormData.host_name || '',
         instant_book: propertyFormData.instant_book,
-        source: editingProperty ? editingProperty.source : 'manual'
+        source: 'manual', // NEW: always 'manual' for this form
+        external_id: `manual_${Date.now()}` // NEW: Unique ID for manual entries
       };
 
-      if (editingProperty) {
+      if (editingPropertyId) { // Check for editingPropertyId instead of editingProperty
         // Update existing property
-        await base44.entities.Property.update(editingProperty.id, propertyData);
+        await base44.entities.Property.update(editingPropertyId, propertyData);
         alert('Property updated successfully!');
       } else {
         // Create new property
@@ -477,27 +312,33 @@ export default function AdminPage() {
         alert('Property added successfully!');
       }
       
-      // Reset form
+      // Reset form to new structure
       setPropertyFormData({
-        title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
+        title: '',
+        description: '',
+        location: { city: '', country: '', address: '' },
+        price_per_night: '',
+        caution_fee: '',
+        max_guests: '',
+        bedrooms: '',
+        bathrooms: '',
+        property_type: 'apartment',
+        amenities: '',
+        images: [],
+        videos: [],
+        host_name: '',
+        instant_book: false
       });
-      setEditingProperty(null); // Clear editing state
-      setShowPropertyForm(false);
+      setEditingPropertyId(null); // Clear editing state
       await loadProperties(); // Refresh the property list
+      setActiveAdminTab('manage-properties'); // Switch to manage properties tab after successful save
       
     } catch (error) {
       console.error('Error saving property:', error);
       alert('Failed to save property. Please try again.');
     }
     
-    setIsSubmittingForm(false);
-  };
-
-  const handleFormInputChange = (field, value) => {
-    setPropertyFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setIsSavingProperty(false); // Renamed from isSubmittingForm
   };
   
   const handleImageUpload = async (event) => {
@@ -710,7 +551,7 @@ export default function AdminPage() {
             <h1 className="text-3xl font-bold text-slate-900">Property Data Admin</h1>
             <Badge className="bg-red-100 text-red-800 border-red-200">Admin Only</Badge>
           </div>
-          <p className="text-slate-600 text-lg">Manage property data via CSV import or manual entry</p>
+          <p className="text-slate-600 text-lg">Manage property data via manual entry or live data fetch</p>
         </div>
 
         {/* MCP Data Fetch Tool */}
@@ -821,372 +662,336 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Manual Property Entry Form */}
-        <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                {editingProperty ? 'Edit Property' : 'Manual Property Entry'}
-              </CardTitle>
-              <Button
-                onClick={() => {
-                  setShowPropertyForm(!showPropertyForm);
-                  if (showPropertyForm) { // If closing the form, clear data and editing state
-                    setPropertyFormData({
-                      title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
-                    });
-                    setEditingProperty(null);
-                  }
-                }}
-                variant={showPropertyForm ? "outline" : "default"}
-                className={`${showPropertyForm ? 'border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-              >
-                {showPropertyForm ? 'Close Form' : 'Add Property Manually'}
-              </Button>
-            </div>
-          </CardHeader>
-          
-          <AnimatePresence>
-          {showPropertyForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-            >
+        {/* NEW: Tabs for Manual Entry and Property Management */}
+        <Tabs value={activeAdminTab} onValueChange={setActiveAdminTab} className="space-y-6 mb-8">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="add-manual">
+              <Plus className="w-4 h-4 mr-2" />
+              {editingPropertyId ? 'Edit Property' : 'Add New Property'}
+            </TabsTrigger>
+            <TabsTrigger value="manage-properties">
+              <List className="w-4 h-4 mr-2" />
+              Manage Properties
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="add-manual">
+            <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="w-6 h-6 text-amber-500" />
+                  {editingPropertyId ? 'Edit Property' : 'Add New Property Manually'}
+                </CardTitle>
+                <CardDescription>
+                  {editingPropertyId ? 'Update property information' : 'Enter property details to add to your listings'}
+                </CardDescription>
+              </CardHeader>
               <CardContent>
-                {editingProperty && (
+                {editingPropertyId && (
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
                     <p className="text-sm text-blue-900">
-                      <strong>Editing:</strong> {editingProperty.title}
+                      <strong>Editing:</strong> {propertyFormData.title} (ID: {editingPropertyId.substring(0,8)}...)
                     </p>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                        setEditingPropertyId(null);
+                        setPropertyFormData({
+                          title: '', description: '', location: { city: '', country: '', address: '' }, price_per_night: '', caution_fee: '', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], host_name: '', instant_book: false
+                        });
+                      }} className="mt-2 text-blue-600 hover:bg-blue-100">
+                      <XCircle className="w-3 h-3 mr-1" /> Clear Edit
+                    </Button>
                   </div>
                 )}
                 <form onSubmit={handlePropertyFormSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="title" className="text-sm font-semibold text-slate-700">
-                        Title *
-                      </Label>
-                      <Input
-                        id="title"
-                        value={propertyFormData.title}
-                        onChange={(e) => handleFormInputChange('title', e.target.value)}
-                        placeholder="Property title"
-                        required
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="property_type" className="text-sm font-semibold text-slate-700">
-                        Property Type *
-                      </Label>
-                      <select
-                        id="property_type"
-                        value={propertyFormData.property_type}
-                        onChange={(e) => handleFormInputChange('property_type', e.target.value)}
-                        className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="apartment">Apartment</option>
-                        <option value="house">House</option>
-                        <option value="studio">Studio</option>
-                        <option value="loft">Loft</option>
-                        <option value="penthouse">Penthouse</option>
-                        <option value="villa">Villa</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="description" className="text-sm font-semibold text-slate-700">
-                      Description
-                    </Label>
-                    <textarea
-                      id="description"
-                      value={propertyFormData.description}
-                      onChange={(e) => handleFormInputChange('description', e.target.value)}
-                      placeholder="Property description"
-                      rows={3}
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="city" className="text-sm font-semibold text-slate-700">
-                        City *
-                      </Label>
-                      <Input
-                        id="city"
-                        value={propertyFormData.city}
-                        onChange={(e) => handleFormInputChange('city', e.target.value)}
-                        placeholder="City"
-                        required
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="country" className="text-sm font-semibold text-slate-700">
-                        Country *
-                      </Label>
-                      <Input
-                        id="country"
-                        value={propertyFormData.country}
-                        onChange={(e) => handleFormInputChange('country', e.target.value)}
-                        placeholder="Country"
-                        required
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="address" className="text-sm font-semibold text-slate-700">
-                        Address
-                      </Label>
-                      <Input
-                        id="address"
-                        value={propertyFormData.address}
-                        onChange={(e) => handleFormInputChange('address', e.target.value)}
-                        placeholder="Full address"
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label htmlFor="price_per_night" className="text-sm font-semibold text-slate-700">
-                        Price per Night *
-                      </Label>
-                      <div className="flex items-center gap-2 mt-2">
-                          <Input
-                            id="price_per_night"
-                            type="number"
-                            value={propertyFormData.price_per_night}
-                            onChange={(e) => handleFormInputChange('price_per_night', e.target.value)}
-                            placeholder="150"
-                            required
-                            className="rounded-xl border-slate-200"
-                          />
-                          <Select
-                            value={propertyFormData.currency}
-                            onValueChange={(value) => handleFormInputChange('currency', value)}
-                          >
-                            <SelectTrigger className="w-[120px] rounded-xl border-slate-200">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="USD">USD ($)</SelectItem>
-                              <SelectItem value="NGN">NGN (₦)</SelectItem>
-                            </SelectContent>
-                          </Select>
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-slate-900 flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                      Basic Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="title">Title *</Label>
+                        <Input
+                          id="title"
+                          value={propertyFormData.title}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="e.g., Luxury Downtown Apartment"
+                          required
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="property_type">Property Type *</Label>
+                        <Select
+                          value={propertyFormData.property_type}
+                          onValueChange={(value) => setPropertyFormData(prev => ({ ...prev, property_type: value }))}
+                        >
+                          <SelectTrigger className="w-full mt-1">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="apartment">Apartment</SelectItem>
+                            <SelectItem value="house">House</SelectItem>
+                            <SelectItem value="studio">Studio</SelectItem>
+                            <SelectItem value="loft">Loft</SelectItem>
+                            <SelectItem value="penthouse">Penthouse</SelectItem>
+                            <SelectItem value="villa">Villa</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                    
                     <div>
-                      <Label htmlFor="max_guests" className="text-sm font-semibold text-slate-700">
-                        Max Guests *
-                      </Label>
-                      <Input
-                        id="max_guests"
-                        type="number"
-                        value={propertyFormData.max_guests}
-                        onChange={(e) => handleFormInputChange('max_guests', e.target.value)}
-                        placeholder="4"
-                        required
-                        className="mt-2 rounded-xl border-slate-200"
+                      <Label htmlFor="description">Description</Label>
+                      <textarea
+                        id="description"
+                        value={propertyFormData.description}
+                        onChange={(e) => setPropertyFormData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Detailed description of the property"
+                        rows={3}
+                        className="mt-1 w-full rounded-md border border-slate-200 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
-                    
-                    <div>
-                      <Label htmlFor="bedrooms" className="text-sm font-semibold text-slate-700">
-                        Bedrooms
-                      </Label>
-                      <Input
-                        id="bedrooms"
-                        type="number"
-                        value={propertyFormData.bedrooms}
-                        onChange={(e) => handleFormInputChange('bedrooms', e.target.value)}
-                        placeholder="2"
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="bathrooms" className="text-sm font-semibold text-slate-700">
-                        Bathrooms
-                      </Label>
-                      <Input
-                        id="bathrooms"
-                        type="number"
-                        value={propertyFormData.bathrooms}
-                        onChange={(e) => handleFormInputChange('bathrooms', e.target.value)}
-                        placeholder="1"
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="city">City *</Label>
+                        <Input
+                          id="city"
+                          value={propertyFormData.location.city}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, location: { ...prev.location, city: e.target.value } }))}
+                          placeholder="e.g., Lagos"
+                          required
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="country">Country *</Label>
+                        <Input
+                          id="country"
+                          value={propertyFormData.location.country}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, location: { ...prev.location, country: e.target.value } }))}
+                          placeholder="e.g., Nigeria"
+                          required
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="address">Address</Label>
+                        <Input
+                          id="address"
+                          value={propertyFormData.location.address}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, location: { ...prev.location, address: e.target.value } }))}
+                          placeholder="e.g., 123 Main Street"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="rating" className="text-sm font-semibold text-slate-700">
-                        Rating (0-5)
-                      </Label>
-                      <Input
-                        id="rating"
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="5"
-                        value={propertyFormData.rating}
-                        onChange={(e) => handleFormInputChange('rating', e.target.value)}
-                        placeholder="4.5"
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
+                  {/* Pricing */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-slate-900 flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-green-600" />
+                      Pricing
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="price_per_night">Price per Night (NGN) *</Label>
+                        <Input
+                          id="price_per_night"
+                          type="number"
+                          required
+                          value={propertyFormData.price_per_night}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, price_per_night: e.target.value }))}
+                          placeholder="e.g., 50000"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="caution_fee">Refundable Caution Fee (NGN)</Label>
+                        <Input
+                          id="caution_fee"
+                          type="number"
+                          value={propertyFormData.caution_fee}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, caution_fee: e.target.value }))}
+                          placeholder="e.g., 20000"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Optional refundable deposit for property security</p>
+                      </div>
                     </div>
-                    
-                    <div>
-                      <Label htmlFor="reviews_count" className="text-sm font-semibold text-slate-700">
-                        Reviews Count
-                      </Label>
-                      <Input
-                        id="reviews_count"
-                        type="number"
-                        value={propertyFormData.reviews_count}
-                        onChange={(e) => handleFormInputChange('reviews_count', e.target.value)}
-                        placeholder="120"
-                        className="mt-2 rounded-xl border-slate-200"
-                      />
+                  </div>
+
+                  {/* Property Details */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-slate-900 flex items-center gap-2">
+                      <List className="w-5 h-5 text-purple-600" />
+                      Property Details
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="max_guests">Max Guests *</Label>
+                        <Input
+                          id="max_guests"
+                          type="number"
+                          required
+                          value={propertyFormData.max_guests}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, max_guests: e.target.value }))}
+                          placeholder="e.g., 4"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bedrooms">Bedrooms</Label>
+                        <Input
+                          id="bedrooms"
+                          type="number"
+                          value={propertyFormData.bedrooms}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, bedrooms: e.target.value }))}
+                          placeholder="e.g., 2"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="bathrooms">Bathrooms</Label>
+                        <Input
+                          id="bathrooms"
+                          type="number"
+                          value={propertyFormData.bathrooms}
+                          onChange={(e) => setPropertyFormData(prev => ({ ...prev, bathrooms: e.target.value }))}
+                          placeholder="e.g., 1"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
-                    
                     <div>
-                      <Label htmlFor="host_name" className="text-sm font-semibold text-slate-700">
-                        Host Name
-                      </Label>
+                      <Label htmlFor="amenities">Amenities (comma-separated)</Label>
+                      <Input
+                        id="amenities"
+                        value={propertyFormData.amenities}
+                        onChange={(e) => setPropertyFormData(prev => ({ ...prev, amenities: e.target.value }))}
+                        placeholder="e.g., wifi, kitchen, parking"
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Common: wifi, kitchen, parking, pool, gym, balcony, air_conditioning, heating, washer, dryer, pets_allowed, smoking_allowed, workspace
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Media */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-slate-900 flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-red-600" />
+                      Media
+                    </h3>
+                    <div>
+                      <Label htmlFor="image-upload">Property Images</Label>
+                      <div className="mt-2 flex items-center gap-4">
+                        <Input
+                          id="image-upload"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={isUploadingImages}
+                          className="flex-1 rounded-xl border-slate-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        />
+                        {isUploadingImages && (
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-300 border-t-slate-900" />
+                        )}
+                      </div>
+                      {propertyFormData.images.length > 0 && (
+                        <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                          {propertyFormData.images.map((url, index) => (
+                            <div key={index} className="relative group aspect-square">
+                              <img src={url} alt={`Property image ${index + 1}`} className="w-full h-full object-cover rounded-xl shadow-md" />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveImage(url)}
+                                className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="video-upload">Property Videos</Label>
+                      <div className="mt-2 flex items-center gap-4">
+                        <Input
+                          id="video-upload"
+                          type="file"
+                          multiple
+                          accept="video/*"
+                          onChange={handleVideoUpload}
+                          disabled={isUploadingVideos}
+                          className="flex-1 rounded-xl border-slate-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        />
+                        {isUploadingVideos && (
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-300 border-t-slate-900" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Supported formats: MP4, WebM, AVI, MOV (Max size: 100MB per video)
+                      </p>
+                      {propertyFormData.videos.length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                          {propertyFormData.videos.map((url, index) => (
+                            <div key={index} className="relative group aspect-video">
+                              <video 
+                                src={url} 
+                                className="w-full h-full object-cover rounded-xl shadow-md"
+                                controls={false}
+                                preload="metadata"
+                              />
+                              <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+                                <Play className="w-8 h-8 text-white opacity-80" />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveVideo(url)}
+                                className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Host Information */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-slate-900 flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-blue-400" />
+                      Host Information
+                    </h3>
+                    <div>
+                      <Label htmlFor="host_name">Host Name</Label>
                       <Input
                         id="host_name"
                         value={propertyFormData.host_name}
-                        onChange={(e) => handleFormInputChange('host_name', e.target.value)}
-                        placeholder="John Doe"
-                        className="mt-2 rounded-xl border-slate-200"
+                        onChange={(e) => setPropertyFormData(prev => ({ ...prev, host_name: e.target.value }))}
+                        placeholder="e.g., John Doe"
+                        className="mt-1"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="amenities" className="text-sm font-semibold text-slate-700">
-                      Amenities (comma-separated)
-                    </Label>
-                    <Input
-                      id="amenities"
-                      value={propertyFormData.amenities}
-                      onChange={(e) => handleFormInputChange('amenities', e.target.value)}
-                      placeholder="wifi, kitchen, parking, pool, gym, balcony"
-                      className="mt-2 rounded-xl border-slate-200"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Available: wifi, kitchen, parking, pool, gym, balcony, air_conditioning, heating, washer, dryer, pets_allowed, smoking_allowed, workspace
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="image-upload" className="text-sm font-semibold text-slate-700">
-                      Property Images
-                    </Label>
-                    <div className="mt-2 flex items-center gap-4">
-                      <Input
-                        id="image-upload"
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={isUploadingImages}
-                        className="flex-1 rounded-xl border-slate-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="instant_book"
+                        checked={propertyFormData.instant_book}
+                        onChange={(e) => setPropertyFormData(prev => ({ ...prev, instant_book: e.target.checked }))}
+                        className="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500"
                       />
-                      {isUploadingImages && (
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-300 border-t-slate-900" />
-                      )}
+                      <Label htmlFor="instant_book" className="text-sm font-semibold text-slate-700">
+                        Instant Book Available
+                      </Label>
                     </div>
-                    {propertyFormData.images.length > 0 && (
-                      <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                        {propertyFormData.images.map((url, index) => (
-                          <div key={index} className="relative group aspect-square">
-                            <img src={url} alt={`Property image ${index + 1}`} className="w-full h-full object-cover rounded-xl shadow-md" />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage(url)}
-                              className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="video-upload" className="text-sm font-semibold text-slate-700">
-                      Property Videos
-                    </Label>
-                    <div className="mt-2 flex items-center gap-4">
-                      <Input
-                        id="video-upload"
-                        type="file"
-                        multiple
-                        accept="video/*"
-                        onChange={handleVideoUpload}
-                        disabled={isUploadingVideos}
-                        className="flex-1 rounded-xl border-slate-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-                      />
-                      {isUploadingVideos && (
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-300 border-t-slate-900" />
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Supported formats: MP4, WebM, AVI, MOV (Max size: 100MB per video)
-                    </p>
-                    {propertyFormData.videos.length > 0 && (
-                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {propertyFormData.videos.map((url, index) => (
-                          <div key={index} className="relative group aspect-video">
-                            <video 
-                              src={url} 
-                              className="w-full h-full object-cover rounded-xl shadow-md"
-                              controls={false}
-                              preload="metadata"
-                            />
-                            <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
-                              <Play className="w-8 h-8 text-white opacity-80" />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveVideo(url)}
-                              className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="instant_book"
-                      checked={propertyFormData.instant_book}
-                      onChange={(e) => handleFormInputChange('instant_book', e.target.checked)}
-                      className="rounded border-slate-300 text-blue-600 shadow-sm focus:ring-blue-500"
-                    />
-                    <Label htmlFor="instant_book" className="text-sm font-semibold text-slate-700">
-                      Instant Book Available
-                    </Label>
                   </div>
 
                   <div className="flex justify-end space-x-3">
@@ -1194,149 +999,162 @@ export default function AdminPage() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        setShowPropertyForm(false);
-                        setEditingProperty(null); // Clear editing state on cancel
+                        setEditingPropertyId(null); // Clear editing state on cancel
                         setPropertyFormData({ // Reset form data
-                          title: '', description: '', city: '', country: '', address: '', price_per_night: '', currency: 'USD', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], rating: '', reviews_count: '', host_name: '', instant_book: false
+                          title: '', description: '', location: { city: '', country: '', address: '' }, price_per_night: '', caution_fee: '', max_guests: '', bedrooms: '', bathrooms: '', property_type: 'apartment', amenities: '', images: [], videos: [], host_name: '', instant_book: false
                         });
+                        setActiveAdminTab('manage-properties'); // Go back to manage tab
                       }}
-                      disabled={isSubmittingForm}
+                      disabled={isSavingProperty}
                     >
                       Cancel
                     </Button>
                     <Button
                       type="submit"
-                      disabled={isSubmittingForm || isUploadingImages || isUploadingVideos}
+                      disabled={isSavingProperty || isUploadingImages || isUploadingVideos}
                       className="bg-green-600 hover:bg-green-700"
                     >
-                      {isSubmittingForm ? (
+                      {isSavingProperty ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2" />
-                          {editingProperty ? 'Updating...' : 'Adding Property...'}
+                          {editingPropertyId ? 'Updating...' : 'Adding Property...'}
                         </>
                       ) : (
-                        editingProperty ? 'Update Property' : 'Add Property'
+                        editingPropertyId ? 'Update Property' : 'Add Property'
                       )}
                     </Button>
                   </div>
                 </form>
               </CardContent>
-            </motion.div>
-          )}
-          </AnimatePresence>
-        </Card>
+            </Card>
+          </TabsContent>
 
-        {/* NEW: Property Management List */}
-        <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <List className="w-5 h-5" />
-                Property Management ({propertiesList.length} properties)
-              </CardTitle>
-              <Button
-                onClick={loadProperties}
-                disabled={isPropertiesLoading}
-                variant="outline"
-                size="sm"
-              >
-                {isPropertiesLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+          <TabsContent value="manage-properties">
+            <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <List className="w-5 h-5" />
+                    Property Management ({properties.length} properties)
+                  </CardTitle>
+                  <Button
+                    onClick={loadProperties}
+                    disabled={isLoadingProperties}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isLoadingProperties ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Refresh List'
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingProperties ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-slate-400" />
+                    <p className="text-slate-500">Loading properties...</p>
+                  </div>
+                ) : properties.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <Database className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                    <p>No properties found.</p>
+                    <p className="text-sm mt-2">Add properties using the form or fetch live data.</p>
+                    <Button onClick={() => setActiveAdminTab('add-manual')} className="mt-4">
+                      <Plus className="w-4 h-4 mr-2" /> Add Property
+                    </Button>
+                  </div>
                 ) : (
-                  'Refresh List'
-                )}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isPropertiesLoading ? (
-              <div className="text-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-slate-400" />
-                <p className="text-slate-500">Loading properties...</p>
-              </div>
-            ) : propertiesList.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                <Database className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                <p>No properties found.</p>
-                <p className="text-sm mt-2">Add properties using the forms above or refresh the list.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b-2 border-slate-200">
-                    <tr>
-                      <th className="text-left p-3 font-semibold text-slate-700">Title</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Location</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Price/Night</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Type</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Rating</th>
-                      <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {propertiesList.map((property) => (
-                      <tr key={property.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                        <td className="p-3 font-medium text-slate-900 max-w-xs truncate">
-                          {property.title}
-                        </td>
-                        <td className="p-3 text-slate-600">
-                          {property.location?.city}, {property.location?.country}
-                        </td>
-                        <td className="p-3 text-slate-600">
-                          {property.currency === 'NGN' ? '₦' : '$'}{property.price_per_night?.toLocaleString()}
-                        </td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="capitalize">
-                            {property.property_type}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-slate-600">
-                          {property.rating ? (
-                            <div className="flex items-center gap-1">
-                              <span>⭐</span>
-                              <span>{property.rating}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">N/A</span>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              onClick={() => handleEditProperty(property)}
-                              variant="outline"
-                              size="sm"
-                              className="text-blue-600 hover:bg-blue-50 border-blue-200"
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
-                            <Button
-                              onClick={() => handleDeleteClick(property)}
-                              variant="outline"
-                              size="sm"
-                              disabled={deletingPropertyId === property.id}
-                              className="text-red-600 hover:bg-red-50 border-red-200"
-                            >
-                              {deletingPropertyId === property.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 border-b-2 border-slate-200">
+                        <tr>
+                          <th className="text-left p-3 font-semibold text-slate-700">Property</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Location</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Price/Night</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Caution Fee</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Type</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Source</th>
+                          <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {properties.map((property) => (
+                          <tr key={property.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                            <td className="p-3">
+                              <div className="flex items-center gap-3">
+                                <img 
+                                  src={property.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=100'} 
+                                  alt={property.title}
+                                  className="w-12 h-12 rounded-lg object-cover"
+                                />
+                                <div>
+                                  <p className="font-medium text-slate-900">{property.title}</p>
+                                  <p className="text-xs text-slate-500">ID: {property.id.substring(0, 8)}...</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3 text-sm text-slate-600">
+                              {property.location?.city}, {property.location?.country}
+                            </td>
+                            <td className="p-3 font-semibold text-slate-900">
+                              ₦{property.price_per_night?.toLocaleString()}
+                            </td>
+                            <td className="p-3 text-slate-600">
+                              {property.caution_fee > 0 ? (
+                                <span className="text-sm">₦{property.caution_fee?.toLocaleString()}</span>
                               ) : (
-                                <>
-                                  <Trash2 className="w-4 h-4 mr-1" />
-                                  Delete
-                                </>
+                                <span className="text-xs text-slate-400">None</span>
                               )}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="outline" className="capitalize">
+                                {property.property_type}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <Badge className={property.source === 'manual' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
+                                {property.source}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditProperty(property)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeleteClick(property)}
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={deletingPropertyId === property.id}
+                                  className="text-red-600 hover:bg-red-50 border-red-200"
+                                >
+                                  {deletingPropertyId === property.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Trash2 className="w-4 h-4" />
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1503,213 +1321,8 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Sample CSV Download */}
-        <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Download className="w-5 h-5" />
-              Sample CSV Format
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600 mb-4">
-              Download a sample CSV file to see the required format for property data import.
-            </p>
-            <Button onClick={downloadSampleCSV} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Download Sample CSV
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* File Upload */}
-        <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="w-5 h-5" />
-              Upload Property Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label htmlFor="file-upload" className="text-sm font-semibold text-slate-700">
-                Select CSV or Excel File
-              </Label>
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                className="mt-2 rounded-xl border-slate-200"
-              />
-            </div>
-
-            {isUploading && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Uploading...</span>
-                  <span>{progress}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
-            )}
-
-            {uploadedFile && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-green-50 border border-green-200 rounded-xl p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="font-semibold text-green-900">{uploadedFile.name}</p>
-                    <p className="text-sm text-green-700">
-                      Size: ${(uploadedFile.size / 1024).toFixed(2)} KB
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {uploadedFile && !extractedData && (
-              <Button
-                onClick={processUploadedFile}
-                disabled={isProcessing}
-                className="w-full bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white mr-2" />
-                    Processing File...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-5 h-5 mr-2" />
-                    Process & Preview Data
-                  </>
-                )}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Data Preview */}
-        {extractedData && (
-          <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="w-5 h-5" />
-                Data Preview ({extractedData.length} properties)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-64 overflow-y-auto border rounded-xl">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 sticky top-0">
-                    <tr>
-                      <th className="text-left p-3 font-semibold">Title</th>
-                      <th className="text-left p-3 font-semibold">Location</th>
-                      <th className="text-left p-3 font-semibold">Price</th>
-                      <th className="text-left p-3 font-semibold">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {extractedData.slice(0, 10).map((property, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="p-3">{property.title}</td>
-                        <td className="p-3">{property.location.city}, {property.location.country}</td>
-                        <td className="p-3">${property.price_per_night.toLocaleString()}</td>
-                        <td className="p-3">{property.property_type}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {extractedData.length > 10 && (
-                <p className="text-sm text-slate-500 mt-3">
-                  Showing first 10 of {extractedData.length} properties
-                </p>
-              )}
-
-              <Button
-                onClick={importPropertiesToDatabase}
-                disabled={isProcessing}
-                className="w-full mt-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white mr-2" />
-                    Importing to Database...
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-5 h-5 mr-2" />
-                    Import to Database
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Import Results */}
-        {importResults && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {importResults.failed === 0 ? <CheckCircle className="w-5 h-5 text-green-600" /> : <AlertTriangle className="w-5 h-5 text-amber-600" />}
-                  Import Results
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold text-green-900">{importResults.successful}</div>
-                    <div className="text-green-700">Successfully Imported</div>
-                  </div>
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
-                    <div className="text-3xl font-bold text-red-900">{importResults.failed}</div>
-                    <div className="text-red-700">Failed Imports</div>
-                  </div>
-                </div>
-
-                {importResults.errors.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertTriangle className="w-5 h-5 text-amber-600" />
-                      <span className="font-semibold text-amber-900">Import Errors</span>
-                    </div>
-                    <div className="max-h-32 overflow-y-auto text-sm text-amber-800">
-                      {importResults.errors.map((error, index) => (
-                        <div key={index} className="mb-1">{error}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {isProcessing && (
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
-            <Card className="bg-white p-8 rounded-3xl shadow-xl">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-900 border-t-transparent mx-auto mb-4"></div>
-                <p className="text-lg font-semibold text-slate-900 mb-2">Processing...</p>
-                <Progress value={progress} className="w-64" />
-                <p className="text-sm text-slate-600 mt-2">{progress.toFixed(0)}% complete</p>
-              </div>
-            </Card>
-          </div>
-        )}
+        {/* Removed File Upload, Sample CSV, Data Preview, Import Results */}
+        {/* The global isProcessing modal is also removed */}
       </div>
     </div>
   );

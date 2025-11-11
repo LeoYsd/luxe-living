@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Star, MapPin, Users, Bed, Bath, Wifi, Car, Utensils } from "lucide-react";
+import { Heart, Star, MapPin, Users, Bed, Bath, Wifi, Car, Utensils, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -83,10 +84,16 @@ export default function PropertyCard({ property, onToggleWishlist, isWishlisted 
           )}
         </Button>
 
-        <div className="absolute bottom-4 left-4">
+        <div className="absolute bottom-4 left-4 flex flex-col gap-2">
           <Badge className="bg-white/95 text-slate-900 font-semibold px-3 py-1 rounded-full">
             {currencySymbol}{property.price_per_night.toLocaleString()}/night
           </Badge>
+          {property.caution_fee > 0 && (
+            <Badge className="bg-amber-100/95 text-amber-900 font-medium px-3 py-1 rounded-full flex items-center gap-1">
+              <Shield className="w-3 h-3" />
+              {currencySymbols[property.currency] || '₦'}{property.caution_fee.toLocaleString()} caution
+            </Badge>
+          )}
         </div>
       </div>
 

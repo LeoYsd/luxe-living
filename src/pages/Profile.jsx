@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { User } from "@/entities/User";
 import { Referral } from "@/entities/Referral";
+import { base44 } from "@/api/base44Client";
 import { UploadFile } from "@/integrations/Core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserCircle, Mail, MapPin, Languages, Save, Camera, Upload } from "lucide-react";
+import { UserCircle, Mail, MapPin, Languages, Save, Camera, Upload, Phone } from "lucide-react";
 import ReferralCard from "../components/profile/ReferralCard";
 
 export default function ProfilePage() {
@@ -20,9 +21,7 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState({
     profile_picture: "",
     bio: "",
-    phone: "",
-    location: "",
-    preferred_language: "English",
+    phone_number: "",
     travel_style: "",
     interests: ""
   });
@@ -34,14 +33,12 @@ export default function ProfilePage() {
   const loadUserData = async () => {
     setIsLoading(true);
     try {
-      const userData = await User.me();
+      const userData = await base44.auth.me();
       setUser(userData);
       setProfileData({
         profile_picture: userData.profile_picture || "",
         bio: userData.bio || "",
-        phone: userData.phone || "",
-        location: userData.location || "",
-        preferred_language: userData.preferred_language || "English",
+        phone_number: userData.phone_number || "",
         travel_style: userData.travel_style || "",
         interests: userData.interests || ""
       });
@@ -80,7 +77,7 @@ export default function ProfilePage() {
       setProfileData(newProfileData);
       
       // Auto-save the profile picture
-      await User.updateMyUserData({ profile_picture: uploadResult.file_url });
+      await base44.auth.updateMe({ profile_picture: uploadResult.file_url });
       await loadUserData(); // Reload user data
     } catch (error) {
       console.error("Error uploading profile picture:", error);
@@ -92,10 +89,12 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await User.updateMyUserData(profileData);
+      await base44.auth.updateMe(profileData);
+      alert('Profile updated successfully!');
       await loadUserData(); // Reload data
     } catch (error) {
       console.error("Error saving profile:", error);
+      alert('Failed to save profile. Please try again.');
     }
     setIsSaving(false);
   };
@@ -181,36 +180,24 @@ export default function ProfilePage() {
             </CardHeader>
 
             <CardContent className="p-8 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="phone" className="text-sm font-semibold text-slate-700">
-                    Phone Number
-                  </Label>
+              <div>
+                <Label htmlFor="phone_number" className="text-sm font-semibold text-slate-700">
+                  Phone Number *
+                </Label>
+                <div className="relative mt-2">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input
-                    id="phone"
+                    id="phone_number"
                     type="tel"
-                    value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    placeholder="Your phone number"
-                    className="mt-2 rounded-xl border-slate-200"
+                    value={profileData.phone_number}
+                    onChange={(e) => setProfileData({ ...profileData, phone_number: e.target.value })}
+                    placeholder="+234 800 000 0000"
+                    className="pl-10 rounded-xl border-slate-200"
                   />
                 </div>
-
-                <div>
-                  <Label htmlFor="location" className="text-sm font-semibold text-slate-700">
-                    Location
-                  </Label>
-                  <div className="relative mt-2">
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <Input
-                      id="location"
-                      value={profileData.location}
-                      onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
-                      placeholder="Your city, country"
-                      className="pl-10 rounded-xl border-slate-200"
-                    />
-                  </div>
-                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Required for booking confirmations and property communication
+                </p>
               </div>
 
               <div>
@@ -227,31 +214,6 @@ export default function ProfilePage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label className="text-sm font-semibold text-slate-700">
-                    Preferred Language
-                  </Label>
-                  <Select
-                    value={profileData.preferred_language}
-                    onValueChange={(value) => setProfileData({ ...profileData, preferred_language: value })}
-                  >
-                    <SelectTrigger className="mt-2 rounded-xl border-slate-200">
-                      <div className="flex items-center">
-                        <Languages className="mr-2 h-4 w-4 text-slate-400" />
-                        <SelectValue />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="English">English</SelectItem>
-                      <SelectItem value="Spanish">Spanish</SelectItem>
-                      <SelectItem value="French">French</SelectItem>
-                      <SelectItem value="German">German</SelectItem>
-                      <SelectItem value="Italian">Italian</SelectItem>
-                      <SelectItem value="Portuguese">Portuguese</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div>
                   <Label className="text-sm font-semibold text-slate-700">
                     Travel Style
@@ -273,19 +235,25 @@ export default function ProfilePage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div>
+                  <Label htmlFor="interests" className="text-sm font-semibold text-slate-700">
+                    Travel Interests
+                  </Label>
+                  <Input
+                    id="interests"
+                    value={profileData.interests}
+                    onChange={(e) => setProfileData({ ...profileData, interests: e.target.value })}
+                    placeholder="e.g., food, culture, nature"
+                    className="mt-2 rounded-xl border-slate-200"
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="interests" className="text-sm font-semibold text-slate-700">
-                  Travel Interests
-                </Label>
-                <Textarea
-                  id="interests"
-                  value={profileData.interests}
-                  onChange={(e) => setProfileData({ ...profileData, interests: e.target.value })}
-                  placeholder="What do you love about traveling? (food, culture, nature, etc.)"
-                  className="mt-2 rounded-xl border-slate-200 min-h-[80px]"
-                />
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-900">
+                  <strong>📞 Important:</strong> Your phone number will be included in booking records sent to property owners and logged in our booking sheet for communication purposes.
+                </p>
               </div>
 
               <Button

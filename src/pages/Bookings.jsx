@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +56,9 @@ export default function BookingsPage() {
         b.status === 'pending' && b.payment_status === 'unpaid'
       );
       if (hasPendingApprovals) {
+        console.log('🔄 Polling for updates (pending approvals detected)');
         loadAvailabilityRequests();
+        loadBookings(); // Also reload bookings to catch newly created pending bookings
       }
     }, 5000);
 
@@ -63,7 +66,12 @@ export default function BookingsPage() {
   }, [bookings.length]);
 
   const loadBookings = async () => {
-    setIsLoading(true);
+    // Don't show loading spinner for background refreshes
+    const isInitialLoad = bookings.length === 0;
+    if (isInitialLoad) {
+      setIsLoading(true);
+    }
+    
     try {
       const bookingData = await base44.entities.Booking.list("-created_date");
       setBookings(bookingData);
@@ -84,11 +92,15 @@ export default function BookingsPage() {
       }
 
       // Load availability requests for pending bookings
-      await loadAvailabilityRequests();
+      if (isInitialLoad) {
+        await loadAvailabilityRequests();
+      }
     } catch (error) {
       console.error("Error loading bookings:", error);
     } finally {
-      setIsLoading(false);
+      if (isInitialLoad) {
+        setIsLoading(false);
+      }
     }
   };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -19,6 +18,7 @@ export default function CheckoutPage() {
   // Core state
   const [property, setProperty] = useState(null);
   const [user, setUser] = useState(null);
+  const [existingBooking, setExistingBooking] = useState(null);
   const [bookingDetails, setBookingDetails] = useState({
     checkIn: null,
     checkOut: null,
@@ -144,6 +144,38 @@ export default function CheckoutPage() {
   };
 
   const handleBooking = async () => {
+    // If coming from a pre-approved booking, update it instead of creating new
+    if (existingBooking) {
+      setIsBooking(true);
+      try {
+        console.log('🚀 Completing pre-approved booking:', existingBooking.id);
+        
+        await base44.entities.Booking.update(existingBooking.id, {
+          status: 'confirmed',
+          payment_status: 'paid',
+          payment_method: 'paystack'
+        });
+        
+        const loyaltyResult = await awardBookingPoints(existingBooking);
+        const referralResult = await processReferralReward(existingBooking, user);
+        
+        let successMessage = `🎉 Booking confirmed! You earned ${loyaltyResult.pointsEarned} Luxe Points!`;
+        if (referralResult) {
+          successMessage += `\n\n✨ Your referrer earned ₦${referralResult.amountAwardedNGN.toLocaleString()} thanks to you!`;
+        }
+        
+        alert(successMessage);
+        navigate(createPageUrl('Bookings'));
+        
+      } catch (error) {
+        console.error('❌ Booking error:', error);
+        alert('Failed to complete booking. Please try again.');
+      }
+      setIsBooking(false);
+      return;
+    }
+
+    // Original flow for new bookings
     if (availabilityStatus !== 'available') {
       alert('Please check availability first before booking.');
       return;
@@ -159,7 +191,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Proceed with Paystack payment
     setIsBooking(true);
     try {
       console.log('🚀 Starting Paystack booking process...');
@@ -210,29 +241,52 @@ export default function CheckoutPage() {
       setUser(userData);
 
       const params = new URLSearchParams(location.search);
+      const bookingId = params.get('bookingId');
       const propertyId = params.get('property');
       const checkInStr = params.get('checkIn');
       const checkOutStr = params.get('checkOut');
       const guestsStr = params.get('guests');
 
-      if (!propertyId) {
-        navigate(createPageUrl('Search'));
-        return;
+      // Check if coming from a pre-approved booking
+      if (bookingId) {
+        console.log('📋 Loading pre-approved booking:', bookingId);
+        const booking = await base44.entities.Booking.get(bookingId);
+        setExistingBooking(booking);
+
+        const propertyData = await base44.entities.Property.get(booking.property_id);
+        setProperty(propertyData);
+
+        setBookingDetails({
+          checkIn: new Date(booking.check_in),
+          checkOut: new Date(booking.check_out),
+          guests: booking.guests,
+          specialRequests: booking.special_requests || ''
+        });
+
+        // Pre-approved, so skip availability check
+        setAvailabilityStatus('available');
+        setAdminResponse('Your booking has been approved by admin. Complete payment to confirm.');
+      } else {
+        // Regular new booking flow
+        if (!propertyId) {
+          navigate(createPageUrl('Search'));
+          return;
+        }
+
+        const propertyData = await base44.entities.Property.get(propertyId);
+        setProperty(propertyData);
+
+        const checkIn = checkInStr ? new Date(checkInStr) : null;
+        const checkOut = checkOutStr ? new Date(checkOutStr) : null;
+        const guests = guestsStr ? parseInt(guestsStr) : 2;
+
+        setBookingDetails({
+          checkIn,
+          checkOut,
+          specialRequests: '',
+          guests
+        });
       }
-
-      const propertyData = await base44.entities.Property.get(propertyId);
-      setProperty(propertyData);
-
-      const checkIn = checkInStr ? new Date(checkInStr) : null;
-      const checkOut = checkOutStr ? new Date(checkOutStr) : null;
-      const guests = guestsStr ? parseInt(guestsStr) : 2;
-
-      setBookingDetails({
-        checkIn,
-        checkOut,
-        specialRequests: '',
-        guests
-      });
 
     } catch (error) {
       console.error('Error loading checkout data:', error);
@@ -242,9 +296,9 @@ export default function CheckoutPage() {
     setIsLoading(false);
   };
 
-  // Polling for approval
+  // Polling for approval (only for new bookings, not pre-approved ones)
   useEffect(() => {
-    if (!availabilityRequestId || availabilityStatus !== 'pending') {
+    if (!availabilityRequestId || availabilityStatus !== 'pending' || existingBooking) {
       return;
     }
 
@@ -287,7 +341,7 @@ export default function CheckoutPage() {
       console.log('🛑 Cleanup polling');
       clearInterval(pollInterval);
     };
-  }, [availabilityRequestId, availabilityStatus]);
+  }, [availabilityRequestId, availabilityStatus, existingBooking]);
 
   // Calculate price breakdown
   useEffect(() => {
@@ -297,7 +351,7 @@ export default function CheckoutPage() {
       
       if (nightCount > 0 && property) {
         const subtotal = property.price_per_night * nightCount;
-        const serviceFee = Math.round(subtotal * 0.025); // Changed from 0.1 to 0.025
+        const serviceFee = Math.round(subtotal * 0.025);
         const cautionFee = property.caution_fee || 0;
         const total = subtotal + serviceFee + cautionFee;
         
@@ -306,17 +360,22 @@ export default function CheckoutPage() {
         setTotalPrice(0);
       }
       
-      setAvailabilityStatus('unknown');
-      setAvailabilityError(null);
-      setAdminResponse('');
+      // Don't reset availability status if coming from pre-approved booking
+      if (!existingBooking) {
+        setAvailabilityStatus('unknown');
+        setAvailabilityError(null);
+        setAdminResponse('');
+      }
     } else {
       setNights(0);
       setTotalPrice(0);
-      setAvailabilityStatus('unknown');
-      setAvailabilityError(null);
-      setAdminResponse('');
+      if (!existingBooking) {
+        setAvailabilityStatus('unknown');
+        setAvailabilityError(null);
+        setAdminResponse('');
+      }
     }
-  }, [bookingDetails.checkIn, bookingDetails.checkOut, property]);
+  }, [bookingDetails.checkIn, bookingDetails.checkOut, property, existingBooking]);
 
   const handleCheckAvailability = async () => {
     if (!bookingDetails.checkIn || !bookingDetails.checkOut) {
@@ -382,6 +441,22 @@ export default function CheckoutPage() {
       });
 
       console.log('✅ Request created:', request.id);
+      
+      // Create a pending booking record
+      const pendingBooking = await base44.entities.Booking.create({
+        property_id: property.id,
+        guest_name: user.full_name || 'Guest User',
+        guest_email: user.email,
+        check_in: format(bookingDetails.checkIn, 'yyyy-MM-dd'),
+        check_out: format(bookingDetails.checkOut, 'yyyy-MM-dd'),
+        guests: bookingDetails.guests,
+        total_price: totalPrice,
+        special_requests: bookingDetails.specialRequests || '',
+        status: 'pending',
+        payment_status: 'unpaid'
+      });
+
+      console.log('✅ Pending booking created:', pendingBooking.id);
       
       setAvailabilityRequestId(request.id);
       setAvailabilityStatus('pending');
@@ -525,7 +600,7 @@ export default function CheckoutPage() {
                       }}
                       min={format(new Date(), 'yyyy-MM-dd')}
                       className="mt-1"
-                      disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending'}
+                      disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending' || existingBooking}
                     />
                   </div>
                   <div>
@@ -538,7 +613,7 @@ export default function CheckoutPage() {
                       }}
                       min={bookingDetails.checkIn ? format(new Date(new Date(bookingDetails.checkIn).getTime() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
                       className="mt-1"
-                      disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending'}
+                      disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending' || existingBooking}
                     />
                   </div>
                 </div>
@@ -552,7 +627,7 @@ export default function CheckoutPage() {
                     min="1"
                     max={property.max_guests}
                     className="mt-1"
-                    disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending'}
+                    disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending' || existingBooking}
                   />
                 </div>
 
@@ -563,62 +638,64 @@ export default function CheckoutPage() {
                     value={bookingDetails.specialRequests}
                     onChange={(e) => setBookingDetails(prev => ({ ...prev, specialRequests: e.target.value }))}
                     className="mt-1"
-                    disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending'}
+                    disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending' || existingBooking}
                   />
                 </div>
 
-                {/* Availability Section */}
-                <div className="pt-4 border-t border-slate-200">
-                  {availabilityStatus !== 'available' && (
-                    <Button
-                      onClick={handleCheckAvailability}
-                      disabled={isCheckingAvailability || !bookingDetails.checkIn || !bookingDetails.checkOut || isBooking || availabilityStatus === 'pending'}
-                      variant="outline"
-                      className="w-full mb-3"
-                    >
-                      {availabilityStatus === 'pending' ? (
-                        <>
-                          <Clock className="w-4 h-4 mr-2 animate-pulse" />
-                          Awaiting Admin Approval...
-                        </>
-                      ) : isCheckingAvailability ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Sending Request...
-                        </>
-                      ) : (
-                        <>
-                          <Calendar className="w-4 h-4 mr-2" />
-                          Check Availability
-                        </>
-                      )}
-                    </Button>
-                  )}
+                {/* Availability Section - only for new bookings */}
+                {!existingBooking && (
+                  <div className="pt-4 border-t border-slate-200">
+                    {availabilityStatus !== 'available' && (
+                      <Button
+                        onClick={handleCheckAvailability}
+                        disabled={isCheckingAvailability || !bookingDetails.checkIn || !bookingDetails.checkOut || isBooking || availabilityStatus === 'pending'}
+                        variant="outline"
+                        className="w-full mb-3"
+                      >
+                        {availabilityStatus === 'pending' ? (
+                          <>
+                            <Clock className="w-4 h-4 mr-2 animate-pulse" />
+                            Awaiting Admin Approval...
+                          </>
+                        ) : isCheckingAvailability ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending Request...
+                          </>
+                        ) : (
+                          <>
+                            <Calendar className="w-4 h-4 mr-2" />
+                            Check Availability
+                          </>
+                        )}
+                      </Button>
+                    )}
 
-                  {availabilityStatus === 'pending' && (
-                    <div className="flex items-start gap-3 text-amber-600 bg-amber-50 border border-amber-200 p-4 rounded-xl mb-3">
-                      <Clock className="w-5 h-5 animate-pulse flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-sm mb-1">⏳ Awaiting Admin Approval</p>
-                        <p className="text-xs">Your request is being reviewed. This page updates automatically!</p>
+                    {availabilityStatus === 'pending' && (
+                      <div className="flex items-start gap-3 text-amber-600 bg-amber-50 border border-amber-200 p-4 rounded-xl mb-3">
+                        <Clock className="w-5 h-5 animate-pulse flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-sm mb-1">⏳ Awaiting Admin Approval</p>
+                          <p className="text-xs">Your request is being reviewed. You can track it in the "Pending Approval" tab of your bookings!</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {availabilityStatus === 'available' && (
-                    <div className="flex items-center gap-2 text-green-600 bg-green-50 border-2 border-green-200 p-4 rounded-xl mb-3">
-                      <CheckCircle className="w-6 h-6" />
-                      <span className="font-bold">✅ APPROVED! Ready to book</span>
-                    </div>
-                  )}
+                    {availabilityStatus === 'available' && (
+                      <div className="flex items-center gap-2 text-green-600 bg-green-50 border-2 border-green-200 p-4 rounded-xl mb-3">
+                        <CheckCircle className="w-6 h-6" />
+                        <span className="font-bold">✅ APPROVED! Ready to book</span>
+                      </div>
+                    )}
 
-                  {availabilityStatus === 'unavailable' && (
-                    <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg mb-3">
-                      <AlertCircle className="w-5 h-5" />
-                      <span className="font-medium">❌ Not available. Try different dates.</span>
-                    </div>
-                  )}
-                </div>
+                    {availabilityStatus === 'unavailable' && (
+                      <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg mb-3">
+                        <AlertCircle className="w-5 h-5" />
+                        <span className="font-medium">❌ Not available. Try different dates.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Price Summary */}
                 {nights > 0 && (
@@ -628,8 +705,8 @@ export default function CheckoutPage() {
                       <span>₦{(property.price_per_night * nights).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Service Fee (2.5%)</span> {/* Changed from (10%) to (2.5%) */}
-                      <span>₦{Math.round(property.price_per_night * nights * 0.025).toLocaleString()}</span> {/* Changed from 0.1 to 0.025 */}
+                      <span>Service Fee (2.5%)</span>
+                      <span>₦{Math.round(property.price_per_night * nights * 0.025).toLocaleString()}</span>
                     </div>
                     {property.caution_fee > 0 && (
                       <div className="flex justify-between items-center py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -679,7 +756,7 @@ export default function CheckoutPage() {
                       Processing Payment...
                     </>
                   ) : availabilityStatus !== 'available' ? (
-                    'Check Availability First'
+                    existingBooking ? 'Loading...' : 'Check Availability First'
                   ) : (
                     <>
                       Complete Payment (₦{totalPrice.toLocaleString()})

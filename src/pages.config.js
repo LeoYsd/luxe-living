@@ -14,6 +14,8 @@ import Quests from './pages/Quests';
 import Checkout from './pages/Checkout';
 import Support from './pages/Support';
 import PaymentPage from './pages/PaymentPage';
+import BankAccounts from './pages/BankAccounts';
+import Withdrawals from './pages/Withdrawals';
 import Layout from './Layout.jsx';
 
 
@@ -34,6 +36,8 @@ export const PAGES = {
     "Checkout": Checkout,
     "Support": Support,
     "PaymentPage": PaymentPage,
+    "BankAccounts": BankAccounts,
+    "Withdrawals": Withdrawals,
 }
 
 export const pagesConfig = {

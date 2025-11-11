@@ -2,7 +2,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Search, Calendar, User, Heart, Home, MessageCircle, LayoutGrid, Compass, Settings, Shield, HelpCircle, Trophy, LogOut } from "lucide-react";
+import { Search, Calendar, User, Heart, Home, MessageCircle, LayoutGrid, Compass, Settings, Shield, HelpCircle, Trophy, LogOut, DollarSign, CreditCard } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -60,6 +60,18 @@ const navigationItems = [
     url: createPageUrl("Bookings"),
     icon: Calendar,
     description: "Manage reservations"
+  },
+  {
+    title: "Withdrawals",
+    url: createPageUrl("Withdrawals"),
+    icon: DollarSign,
+    description: "Withdraw earnings"
+  },
+  {
+    title: "Bank Accounts",
+    url: createPageUrl("BankAccounts"),
+    icon: CreditCard,
+    description: "Manage bank accounts"
   },
   {
     title: "Wishlist",

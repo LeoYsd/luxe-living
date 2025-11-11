@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,15 +83,10 @@ export default function PropertyCard({ property, onToggleWishlist, isWishlisted 
           )}
         </Button>
 
-        <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+        <div className="absolute bottom-4 left-4">
           <Badge className="bg-white/95 text-slate-900 font-semibold px-3 py-1 rounded-full">
             {currencySymbol}{property.price_per_night.toLocaleString()}/night
           </Badge>
-          {property.caution_fee > 0 && (
-            <Badge variant="outline" className="bg-amber-50/95 text-amber-700 border-amber-300 font-medium px-3 py-1 rounded-full">
-              +{currencySymbol}{property.caution_fee.toLocaleString()} deposit
-            </Badge>
-          )}
         </div>
       </div>
 

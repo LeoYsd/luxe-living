@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     MapPin, Users, Bed, Bath, Wifi, Car, Utensils, Star, Calendar, 
-    ArrowLeft, Share2, Heart, PlayCircle, Image as ImageIcon, Shield 
+    ArrowLeft, Share2, Heart, PlayCircle, Image as ImageIcon 
 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -205,21 +205,6 @@ export default function PropertyPage() {
                                             {currencySymbol}{property.price_per_night.toLocaleString()}
                                         </div>
                                         <div className="text-base text-slate-600 mt-1">per night</div>
-                                        
-                                        {property.caution_fee > 0 && (
-                                          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                                            <div className="flex items-center gap-2 mb-1">
-                                              <Shield className="w-4 h-4 text-amber-600" />
-                                              <span className="text-sm font-semibold text-amber-900">Refundable Deposit</span>
-                                            </div>
-                                            <p className="text-sm text-amber-700">
-                                              {currencySymbol}{property.caution_fee.toLocaleString()} security deposit required
-                                            </p>
-                                            <p className="text-xs text-amber-600 mt-1">
-                                              Fully refunded after checkout inspection
-                                            </p>
-                                          </div>
-                                        )}
                                     </div>
 
                                     {property.rating > 0 && (

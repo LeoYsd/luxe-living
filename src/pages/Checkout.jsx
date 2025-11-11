@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -143,6 +144,23 @@ export default function CheckoutPage() {
     }
   };
 
+  const logBookingToGoogleSheet = async (bookingId) => {
+    try {
+      console.log('📊 Logging booking to Google Sheet...');
+      const response = await base44.functions.invoke('logBookingToGoogleSheet', {
+        booking_id: bookingId
+      });
+      
+      if (response.data && response.data.success) {
+        console.log('✅ Successfully logged to Google Sheet');
+      } else {
+        console.error('⚠️ Failed to log to Google Sheet:', response.data?.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('❌ Error logging to Google Sheet:', error);
+    }
+  };
+
   const handleBooking = async () => {
     // If coming from a pre-approved booking, update it instead of creating new
     if (existingBooking) {
@@ -158,6 +176,9 @@ export default function CheckoutPage() {
         
         const loyaltyResult = await awardBookingPoints(existingBooking);
         const referralResult = await processReferralReward(existingBooking, user);
+        
+        // Log to Google Sheet (fire-and-forget)
+        logBookingToGoogleSheet(existingBooking.id);
         
         let successMessage = `🎉 Booking confirmed! You earned ${loyaltyResult.pointsEarned} Luxe Points!`;
         if (referralResult) {
@@ -213,6 +234,9 @@ export default function CheckoutPage() {
       
       const loyaltyResult = await awardBookingPoints(bookingData);
       const referralResult = await processReferralReward(bookingData, user);
+      
+      // Log to Google Sheet (fire-and-forget, don't block user flow)
+      logBookingToGoogleSheet(bookingData.id);
       
       let successMessage = `🎉 Booking confirmed! You earned ${loyaltyResult.pointsEarned} Luxe Points!`;
       if (referralResult) {

@@ -521,102 +521,108 @@ export default function BookingsPage() {
           <p className="text-slate-600 text-lg">Manage your travel reservations and plan your trips</p>
         </div>
 
-        {bookings.length === 0 ? (
-          <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg">
-            <CardContent className="p-12 text-center">
-              <div className="text-6xl mb-6">✈️</div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">No bookings yet</h2>
-              <p className="text-slate-600 mb-6">Start planning your next adventure!</p>
-              <Link to={createPageUrl("Search")}>
-                <Button className="bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white px-8 py-3 rounded-xl font-semibold">
-                  Discover Properties
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <Tabs defaultValue="pending-approval" className="space-y-6">
-            <TabsList className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm">
-              <TabsTrigger value="pending-approval" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-                Pending Approval {pendingApproval.length > 0 && `(${pendingApproval.length})`}
-              </TabsTrigger>
-              <TabsTrigger value="upcoming" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-                Upcoming {upcoming.length > 0 && `(${upcoming.length})`}
-              </TabsTrigger>
-              <TabsTrigger value="current" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-                Current {current.length > 0 && `(${current.length})`}
-              </TabsTrigger>
-              <TabsTrigger value="past" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-                Past {past.length > 0 && `(${past.length})`}
-              </TabsTrigger>
-              <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-                Cancelled {cancelledBookings.length > 0 && `(${cancelledBookings.length})`}
-              </TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="pending-approval" className="space-y-6">
+          <TabsList className="bg-white/80 backdrop-blur-sm p-1 rounded-xl shadow-sm">
+            <TabsTrigger value="pending-approval" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              Pending Approval {pendingApproval.length > 0 && `(${pendingApproval.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="upcoming" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              Upcoming {upcoming.length > 0 && `(${upcoming.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="current" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              Current {current.length > 0 && `(${current.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="past" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              Past {past.length > 0 && `(${past.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              Cancelled {cancelledBookings.length > 0 && `(${cancelledBookings.length})`}
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="pending-approval" className="space-y-6">
-              <AnimatePresence>
-                {pendingApproval.length > 0 ? (
-                  pendingApproval.map(booking => <PendingApprovalCard key={booking.id} booking={booking} />)
-                ) : (
-                  <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
-                    <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">No Pending Approvals</h3>
-                    <p className="text-slate-600">All your bookings have been processed. Start exploring new properties!</p>
-                  </Card>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+          <TabsContent value="pending-approval" className="space-y-6">
+            <AnimatePresence>
+              {pendingApproval.length > 0 ? (
+                pendingApproval.map(booking => <PendingApprovalCard key={booking.id} booking={booking} />)
+              ) : (
+                <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-12 text-center">
+                  <div className="text-6xl mb-6">⏳</div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No Pending Approvals</h3>
+                  <p className="text-slate-600 mb-6">You don't have any bookings awaiting approval.</p>
+                  <p className="text-sm text-slate-500 mb-6">
+                    When you request to book a property, it will appear here while the admin reviews availability.
+                  </p>
+                  <Link to={createPageUrl("Search")}>
+                    <Button className="bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white px-8 py-3 rounded-xl font-semibold">
+                      Discover Properties
+                    </Button>
+                  </Link>
+                </Card>
+              )}
+            </AnimatePresence>
+          </TabsContent>
 
-            <TabsContent value="upcoming" className="space-y-6">
-              <AnimatePresence>
-                {upcoming.length > 0 ? (
-                  upcoming.map(booking => <BookingCard key={booking.id} booking={booking} />)
-                ) : (
-                  <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
-                    <p className="text-slate-600">No upcoming bookings</p>
-                  </Card>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+          <TabsContent value="upcoming" className="space-y-6">
+            <AnimatePresence>
+              {upcoming.length > 0 ? (
+                upcoming.map(booking => <BookingCard key={booking.id} booking={booking} />)
+              ) : (
+                <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-12 text-center">
+                  <div className="text-6xl mb-6">📅</div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No Upcoming Bookings</h3>
+                  <p className="text-slate-600 mb-6">Start planning your next adventure!</p>
+                  <Link to={createPageUrl("Search")}>
+                    <Button className="bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white px-8 py-3 rounded-xl font-semibold">
+                      Discover Properties
+                    </Button>
+                  </Link>
+                </Card>
+              )}
+            </AnimatePresence>
+          </TabsContent>
 
-            <TabsContent value="current" className="space-y-6">
-              <AnimatePresence>
-                {current.length > 0 ? (
-                  current.map(booking => <BookingCard key={booking.id} booking={booking} />)
-                ) : (
-                  <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
-                    <p className="text-slate-600">No current bookings</p>
-                  </Card>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+          <TabsContent value="current" className="space-y-6">
+            <AnimatePresence>
+              {current.length > 0 ? (
+                current.map(booking => <BookingCard key={booking.id} booking={booking} />)
+              ) : (
+                <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
+                  <div className="text-6xl mb-4">🏠</div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No Current Stays</h3>
+                  <p className="text-slate-600">You don't have any active bookings at the moment.</p>
+                </Card>
+              )}
+            </AnimatePresence>
+          </TabsContent>
 
-            <TabsContent value="past" className="space-y-6">
-              <AnimatePresence>
-                {past.length > 0 ? (
-                  past.map(booking => <BookingCard key={booking.id} booking={booking} />)
-                ) : (
-                  <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
-                    <p className="text-slate-600">No past bookings</p>
-                  </Card>
-                )}
-              </AnimatePresence>
-            </TabsContent>
+          <TabsContent value="past" className="space-y-6">
+            <AnimatePresence>
+              {past.length > 0 ? (
+                past.map(booking => <BookingCard key={booking.id} booking={booking} />)
+              ) : (
+                <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
+                  <div className="text-6xl mb-4">🕰️</div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No Past Bookings</h3>
+                  <p className="text-slate-600">Your booking history will appear here.</p>
+                </Card>
+              )}
+            </AnimatePresence>
+          </TabsContent>
 
-            <TabsContent value="cancelled" className="space-y-6">
-              <AnimatePresence>
-                {cancelledBookings.length > 0 ? (
-                  cancelledBookings.map(booking => <BookingCard key={booking.id} booking={booking} />)
-                ) : (
-                  <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
-                    <p className="text-slate-600">No cancelled bookings</p>
-                  </Card>
-                )}
-              </AnimatePresence>
-            </TabsContent>
-          </Tabs>
-        )}
+          <TabsContent value="cancelled" className="space-y-6">
+            <AnimatePresence>
+              {cancelledBookings.length > 0 ? (
+                cancelledBookings.map(booking => <BookingCard key={booking.id} booking={booking} />)
+              ) : (
+                <Card className="bg-white/90 backdrop-blur-sm border-slate-200 rounded-3xl shadow-lg p-8 text-center">
+                  <div className="text-6xl mb-4">✅</div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No Cancelled Bookings</h3>
+                  <p className="text-slate-600">You haven't cancelled any bookings.</p>
+                </Card>
+              )}
+            </AnimatePresence>
+          </TabsContent>
+        </Tabs>
 
         <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
           <AlertDialogContent>

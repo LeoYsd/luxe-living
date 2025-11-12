@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, Users, Clock, ExternalLink, Compass, X, AlertCircle, CreditCard, CheckCircle2, Loader2 } from "lucide-react";
+import { Calendar, MapPin, Users, Clock, ExternalLink, Compass, X, AlertCircle, CreditCard, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { format, isAfter, isBefore, parseISO } from "date-fns";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -39,6 +39,7 @@ export default function BookingsPage() {
   const [properties, setProperties] = useState({});
   const [availabilityRequests, setAvailabilityRequests] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [cancellingBookingId, setCancellingBookingId] = useState(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -48,32 +49,44 @@ export default function BookingsPage() {
   };
 
   useEffect(() => {
+    console.log('🔄 Initial load of bookings page');
     loadBookings();
     
-    // Poll for updates every 5 seconds when there are pending approvals
+    // Poll for updates every 3 seconds when there are pending approvals
     const interval = setInterval(() => {
       const hasPendingApprovals = bookings.some(b => 
         b.status === 'pending' && b.payment_status === 'unpaid'
       );
+      
       if (hasPendingApprovals) {
-        console.log('🔄 Polling for updates (pending approvals detected)');
+        console.log('🔄 Auto-refreshing (pending approvals detected)');
+        loadBookings(true); // Silent refresh
         loadAvailabilityRequests();
-        loadBookings(); // Also reload bookings to catch newly created pending bookings
       }
-    }, 5000);
+    }, 3000); // Reduced from 5s to 3s for faster updates
 
     return () => clearInterval(interval);
   }, [bookings.length]);
 
-  const loadBookings = async () => {
-    // Don't show loading spinner for background refreshes
-    const isInitialLoad = bookings.length === 0;
-    if (isInitialLoad) {
+  const loadBookings = async (silent = false) => {
+    // Show loading spinner only for initial load, not for background refreshes
+    if (!silent && bookings.length === 0) {
       setIsLoading(true);
+    } else if (!silent) {
+      setIsRefreshing(true);
     }
     
     try {
-      const bookingData = await base44.entities.Booking.list("-created_date");
+      console.log('📡 Fetching bookings from database...');
+      const bookingData = await base44.entities.Booking.filter({}, '-created_date'); // Most recent first
+      console.log(`✅ Loaded ${bookingData.length} bookings`);
+      
+      // Log pending bookings specifically
+      const pendingBookings = bookingData.filter(b => b.status === 'pending' && b.payment_status === 'unpaid');
+      console.log(`📋 Found ${pendingBookings.length} pending approval bookings:`, 
+        pendingBookings.map(b => ({ id: b.id, property_id: b.property_id, created: b.created_date }))
+      );
+      
       setBookings(bookingData);
 
       const validPropertyIds = [...new Set(
@@ -83,6 +96,7 @@ export default function BookingsPage() {
       )];
       
       if (validPropertyIds.length > 0) {
+        console.log('🏠 Loading property details for', validPropertyIds.length, 'properties');
         const propertiesData = await base44.entities.Property.filter({ id: { $in: validPropertyIds } });
         const propertyMap = propertiesData.reduce((acc, prop) => {
           acc[prop.id] = prop;
@@ -91,36 +105,45 @@ export default function BookingsPage() {
         setProperties(propertyMap);
       }
 
-      // Load availability requests for pending bookings
-      if (isInitialLoad) {
-        await loadAvailabilityRequests();
-      }
+      // Always load availability requests to get latest status
+      await loadAvailabilityRequests();
+      
     } catch (error) {
-      console.error("Error loading bookings:", error);
+      console.error("❌ Error loading bookings:", error);
     } finally {
-      if (isInitialLoad) {
+      if (!silent) {
         setIsLoading(false);
+        setIsRefreshing(false);
       }
     }
   };
 
   const loadAvailabilityRequests = async () => {
     try {
+      console.log('📡 Fetching availability requests...');
       const user = await base44.auth.me();
       const requests = await base44.entities.AvailabilityRequest.filter({
         user_email: user.email
-      });
+      }, '-created_date');
+      
+      console.log(`✅ Loaded ${requests.length} availability requests`);
       
       const requestMap = {};
       requests.forEach(req => {
         const key = `${req.property_id}_${req.check_in}_${req.check_out}`;
         requestMap[key] = req;
+        console.log(`  📋 Request ${req.id}: ${req.status} for ${req.property_title}`);
       });
       
       setAvailabilityRequests(requestMap);
     } catch (error) {
-      console.error("Error loading availability requests:", error);
+      console.error("❌ Error loading availability requests:", error);
     }
+  };
+
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    await loadBookings();
   };
 
   const getAvailabilityRequest = (booking) => {
@@ -135,13 +158,17 @@ export default function BookingsPage() {
     const past = [];
     const pendingApproval = [];
 
+    console.log('📊 Categorizing', bookings.length, 'bookings...');
+
     bookings.forEach(booking => {
+      // Skip cancelled bookings from main categorization
       if (booking.status === 'cancelled') {
         return;
       }
 
-      // Separate pending bookings awaiting approval
+      // CRITICAL: Identify pending bookings awaiting approval
       if (booking.status === 'pending' && booking.payment_status === 'unpaid') {
+        console.log('✅ Found pending approval booking:', booking.id);
         pendingApproval.push(booking);
         return;
       }
@@ -156,6 +183,14 @@ export default function BookingsPage() {
       } else {
         current.push(booking);
       }
+    });
+
+    console.log('📊 Categorization complete:', {
+      pendingApproval: pendingApproval.length,
+      upcoming: upcoming.length,
+      current: current.length,
+      past: past.length,
+      cancelled: bookings.filter(b => b.status === 'cancelled').length
     });
 
     return { upcoming, current, past, pendingApproval };
@@ -332,7 +367,7 @@ export default function BookingsPage() {
 
                 <div className="flex justify-between items-center pt-4 border-t border-slate-200">
                   <div className="text-sm text-slate-500">
-                    Requested on {format(new Date(booking.created_date), "MMM d, yyyy")}
+                    Requested on {format(new Date(booking.created_date), "MMM d, yyyy 'at' h:mm a")}
                   </div>
                   <div className="flex gap-3">
                     {property && (
@@ -528,9 +563,21 @@ export default function BookingsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">My Bookings</h1>
-          <p className="text-slate-600 text-lg">Manage your travel reservations and plan your trips</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">My Bookings</h1>
+            <p className="text-slate-600 text-lg">Manage your travel reservations and plan your trips</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="rounded-xl"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </div>
 
         <Tabs defaultValue="pending-approval" className="space-y-6">

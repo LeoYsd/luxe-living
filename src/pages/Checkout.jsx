@@ -7,10 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, MapPin, Users, ArrowLeft, CheckCircle, Loader2, Clock, AlertCircle, Shield } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowLeft, CheckCircle, Loader2, Clock, AlertCircle, Shield, Phone } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function CheckoutPage() {
   const location = useLocation();
@@ -30,6 +37,12 @@ export default function CheckoutPage() {
   const [nights, setNights] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
+  
+  // Phone number modal state
+  const [showPhoneNumberModal, setShowPhoneNumberModal] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
   
   // Availability check state
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
@@ -161,7 +174,38 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleSavePhoneNumber = async () => {
+    setPhoneError('');
+    
+    // Validate phone number
+    if (!phoneNumber || phoneNumber.trim().length < 10) {
+      setPhoneError('Please enter a valid phone number (at least 10 digits)');
+      return;
+    }
+    
+    setIsSavingPhone(true);
+    try {
+      await base44.auth.updateMe({ phone_number: phoneNumber.trim() });
+      
+      // Update local user state
+      setUser(prev => ({ ...prev, phone_number: phoneNumber.trim() }));
+      setShowPhoneNumberModal(false);
+      
+      console.log('✅ Phone number saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving phone number:', error);
+      setPhoneError('Failed to save phone number. Please try again.');
+    }
+    setIsSavingPhone(false);
+  };
+
   const handleBooking = async () => {
+    // Check if phone number is missing
+    if (!user?.phone_number) {
+      setShowPhoneNumberModal(true);
+      return;
+    }
+
     // If coming from a pre-approved booking, update it instead of creating new
     if (existingBooking) {
       setIsBooking(true);
@@ -263,6 +307,11 @@ export default function CheckoutPage() {
     try {
       const userData = await base44.auth.me();
       setUser(userData);
+      
+      // Pre-fill phone number if exists
+      if (userData.phone_number) {
+        setPhoneNumber(userData.phone_number);
+      }
 
       const params = new URLSearchParams(location.search);
       const bookingId = params.get('bookingId');
@@ -402,6 +451,12 @@ export default function CheckoutPage() {
   }, [bookingDetails.checkIn, bookingDetails.checkOut, property, existingBooking]);
 
   const handleCheckAvailability = async () => {
+    // Check if phone number is missing
+    if (!user?.phone_number) {
+      setShowPhoneNumberModal(true);
+      return;
+    }
+
     if (!bookingDetails.checkIn || !bookingDetails.checkOut) {
       alert('Please select both check-in and check-out dates.');
       return;
@@ -532,6 +587,72 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-8">
+      {/* Phone Number Modal */}
+      <Dialog open={showPhoneNumberModal} onOpenChange={setShowPhoneNumberModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="w-5 h-5 text-amber-600" />
+              Phone Number Required
+            </DialogTitle>
+            <DialogDescription>
+              Please provide your phone number to proceed with the booking. This is essential for booking confirmations and property communication.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="phone-modal">Phone Number *</Label>
+              <Input
+                id="phone-modal"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => {
+                  setPhoneNumber(e.target.value);
+                  setPhoneError('');
+                }}
+                placeholder="+234 800 000 0000"
+                className="mt-1"
+                disabled={isSavingPhone}
+              />
+              {phoneError && (
+                <p className="text-sm text-red-600 mt-1">{phoneError}</p>
+              )}
+            </div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs text-amber-900">
+                <strong>📞 Important:</strong> Your phone number will be shared with the property owner for booking coordination and logged in our booking records.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowPhoneNumberModal(false)}
+              disabled={isSavingPhone}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePhoneNumber}
+              disabled={isSavingPhone || !phoneNumber}
+              className="bg-gradient-to-r from-slate-900 to-slate-800"
+            >
+              {isSavingPhone ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save & Continue'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-7xl mx-auto">
         {/* Approval Banner */}
         <AnimatePresence>

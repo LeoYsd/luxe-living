@@ -16,6 +16,7 @@ import Support from './pages/Support';
 import PaymentPage from './pages/PaymentPage';
 import BankAccounts from './pages/BankAccounts';
 import Withdrawals from './pages/Withdrawals';
+import ReferralTest from './pages/ReferralTest';
 import Layout from './Layout.jsx';
 
 
@@ -38,6 +39,7 @@ export const PAGES = {
     "PaymentPage": PaymentPage,
     "BankAccounts": BankAccounts,
     "Withdrawals": Withdrawals,
+    "ReferralTest": ReferralTest,
 }
 
 export const pagesConfig = {

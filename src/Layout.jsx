@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { User as UserEntity } from "@/entities/User";
+import ReferralTracker from "@/components/utils/ReferralTracker";
 
 const navigationItems = [
   {
@@ -121,6 +122,9 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <SidebarProvider defaultOpen={true}>
+      {/* Referral Tracker - runs silently in the background */}
+      <ReferralTracker />
+      
       <style>{`
         :root {
           --primary-navy: #0F172A;

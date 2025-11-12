@@ -18,6 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 
 export default function CheckoutPage() {
   const location = useLocation();
@@ -50,6 +55,8 @@ export default function CheckoutPage() {
   const [availabilityRequestId, setAvailabilityRequestId] = useState(null);
   const [availabilityError, setAvailabilityError] = useState(null);
   const [adminResponse, setAdminResponse] = useState('');
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState(null);
 
   const calculateLoyaltyTier = (points) => {
     if (points >= 10000) return 'Diamond';
@@ -392,6 +399,7 @@ export default function CheckoutPage() {
           setAdminResponse(request.admin_response || 'Property is available for your dates!');
           setAvailabilityRequestId(null);
           setIsCheckingAvailability(false);
+          setShowSuccessMessage(false);
           
           console.log('✅ State updated to AVAILABLE');
           
@@ -404,6 +412,7 @@ export default function CheckoutPage() {
           setAdminResponse(request.admin_response || 'Property is not available for these dates.');
           setAvailabilityRequestId(null);
           setIsCheckingAvailability(false);
+          setShowSuccessMessage(false);
         }
       } catch (error) {
         console.error('❌ Polling error:', error);
@@ -438,6 +447,7 @@ export default function CheckoutPage() {
         setAvailabilityStatus('unknown');
         setAvailabilityError(null);
         setAdminResponse('');
+        setShowSuccessMessage(false);
       }
     } else {
       setNights(0);
@@ -446,6 +456,7 @@ export default function CheckoutPage() {
         setAvailabilityStatus('unknown');
         setAvailabilityError(null);
         setAdminResponse('');
+        setShowSuccessMessage(false);
       }
     }
   }, [bookingDetails.checkIn, bookingDetails.checkOut, property, existingBooking]);
@@ -468,13 +479,25 @@ export default function CheckoutPage() {
     }
 
     console.log('=== CHECKING AVAILABILITY ===');
+    console.log('📋 Booking Details:', {
+      property_id: property.id,
+      property_title: property.title,
+      check_in: format(bookingDetails.checkIn, 'yyyy-MM-dd'),
+      check_out: format(bookingDetails.checkOut, 'yyyy-MM-dd'),
+      guests: bookingDetails.guests,
+      user_email: user.email
+    });
+
     setIsCheckingAvailability(true);
     setAvailabilityStatus('unknown');
     setAvailabilityRequestId(null);
     setAvailabilityError(null);
     setAdminResponse('');
+    setShowSuccessMessage(false);
 
     try {
+      // Step 1: Check for conflicts
+      console.log('🔍 Step 1: Checking for booking conflicts...');
       const existingBookings = await base44.entities.Booking.filter({
         property_id: property.id,
         status: { $in: ['confirmed', 'pending'] }
@@ -497,10 +520,17 @@ export default function CheckoutPage() {
         ) {
           hasConflict = true;
           conflictingBooking = booking;
+          console.log('⚠️ Conflict detected with existing booking:', booking.id);
           break;
         }
       }
 
+      if (!hasConflict) {
+        console.log('✅ No conflicts found');
+      }
+
+      // Step 2: Create AvailabilityRequest
+      console.log('📝 Step 2: Creating AvailabilityRequest...');
       const request = await base44.entities.AvailabilityRequest.create({
         property_id: property.id,
         property_title: property.title,
@@ -519,9 +549,10 @@ export default function CheckoutPage() {
         } : null
       });
 
-      console.log('✅ Request created:', request.id);
+      console.log('✅ AvailabilityRequest created with ID:', request.id);
       
-      // Create a pending booking record
+      // Step 3: Create pending Booking record
+      console.log('📝 Step 3: Creating pending Booking record...');
       const pendingBooking = await base44.entities.Booking.create({
         property_id: property.id,
         guest_name: user.full_name || 'Guest User',
@@ -535,12 +566,17 @@ export default function CheckoutPage() {
         payment_status: 'unpaid'
       });
 
-      console.log('✅ Pending booking created:', pendingBooking.id);
+      console.log('✅ Pending Booking created with ID:', pendingBooking.id);
+      setCreatedBookingId(pendingBooking.id);
       
+      // Step 4: Update state and show success message
       setAvailabilityRequestId(request.id);
       setAvailabilityStatus('pending');
+      setShowSuccessMessage(true);
       setIsCheckingAvailability(false);
 
+      // Step 5: Send Telegram notification (non-blocking)
+      console.log('📤 Step 4: Sending Telegram notification...');
       try {
         await base44.functions.invoke('sendTelegramNotification', {
           request_id: request.id,
@@ -553,15 +589,30 @@ export default function CheckoutPage() {
           guests: bookingDetails.guests,
           has_conflict: hasConflict
         });
+        console.log('✅ Telegram notification sent successfully');
       } catch (telegramError) {
-        console.error('Failed to send Telegram notification:', telegramError);
+        console.error('⚠️ Failed to send Telegram notification:', telegramError);
+        // Don't fail the entire process if Telegram fails
       }
 
+      console.log('🎉 Availability check process completed successfully!');
+      console.log('📊 Summary:', {
+        availabilityRequestId: request.id,
+        pendingBookingId: pendingBooking.id,
+        hasConflict,
+        status: 'pending'
+      });
+
     } catch (error) {
-      console.error('❌ Error checking availability:', error);
+      console.error('❌ Error during availability check:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
       setAvailabilityError(error.message);
       setAvailabilityStatus('unknown');
       setIsCheckingAvailability(false);
+      setShowSuccessMessage(false);
       alert('Could not check availability. Please try again or contact support.');
     }
   };
@@ -652,6 +703,47 @@ export default function CheckoutPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Success Message for Pending Booking */}
+      <AnimatePresence>
+        {showSuccessMessage && availabilityStatus === 'pending' && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-lg w-full mx-4"
+          >
+            <Alert className="bg-green-50 border-green-200 shadow-2xl">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <AlertTitle className="text-green-900 font-bold">Request Submitted Successfully! 🎉</AlertTitle>
+              <AlertDescription className="text-green-800">
+                <div className="space-y-2 mt-2">
+                  <p>Your booking request has been created and is now awaiting admin approval.</p>
+                  <div className="flex gap-2 mt-3">
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        setShowSuccessMessage(false); // Dismiss message when navigating
+                        navigate(createPageUrl('Bookings'));
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      View in Pending Approvals
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setShowSuccessMessage(false)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="max-w-7xl mx-auto">
         {/* Approval Banner */}
@@ -816,7 +908,7 @@ export default function CheckoutPage() {
                       </Button>
                     )}
 
-                    {availabilityStatus === 'pending' && (
+                    {availabilityStatus === 'pending' && !showSuccessMessage && (
                       <div className="flex items-start gap-3 text-amber-600 bg-amber-50 border border-amber-200 p-4 rounded-xl mb-3">
                         <Clock className="w-5 h-5 animate-pulse flex-shrink-0 mt-0.5" />
                         <div>

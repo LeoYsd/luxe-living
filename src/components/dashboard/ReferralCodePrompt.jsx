@@ -11,11 +11,19 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Check for referral code in URL parameters when component mounts
-        const urlParams = new URLSearchParams(window.location.search);
-        const refCode = urlParams.get('ref');
-        if (refCode) {
-            setCode(refCode);
+        // Check for referral code in localStorage first (set by ReferralTracker)
+        const storedCode = localStorage.getItem('luxeliving_referral_code');
+        if (storedCode) {
+            console.log('📋 Found stored referral code in localStorage:', storedCode);
+            setCode(storedCode);
+        } else {
+            // Fallback: Check URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const refCode = urlParams.get('ref');
+            if (refCode) {
+                console.log('📋 Found referral code in URL:', refCode);
+                setCode(refCode);
+            }
         }
     }, []);
 
@@ -54,7 +62,7 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
             // 2. Update the current user's data
             await base44.auth.updateMe({ 
                 referred_by_code: code.trim().toUpperCase(),
-                has_seen_referral_prompt: true 
+                referral_prompt_seen: true  // Mark as seen to prevent showing again
             });
             
             console.log('✅ User updated with referral code');
@@ -68,7 +76,11 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
             
             console.log('✅ Referral record created');
             
-            alert('🎉 Referral code applied! Your referrer will earn points when you make your first booking!');
+            // 4. Clear the stored code from localStorage
+            localStorage.removeItem('luxeliving_referral_code');
+            console.log('🧹 Cleared referral code from localStorage');
+            
+            alert('🎉 Referral code applied! Your referrer will earn rewards when you make your first booking!');
             
             onSubmitted(); // This will close the dialog and reload data
             setOpen(false);
@@ -82,7 +94,9 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
 
     const handleSkip = async () => {
         try {
-            await base44.auth.updateMe({ has_seen_referral_prompt: true });
+            await base44.auth.updateMe({ referral_prompt_seen: true });
+            // Clear stored code if user skips
+            localStorage.removeItem('luxeliving_referral_code');
             onSubmitted();
             setOpen(false);
         } catch (error) {
@@ -95,9 +109,9 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleSkip()}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl">Welcome to Luxeliving!</DialogTitle>
+                    <DialogTitle className="text-2xl">Welcome to Luxeliving! 🎉</DialogTitle>
                     <DialogDescription>
-                        Did a friend refer you? Enter their referral code below to help them earn rewards.
+                        Did a friend refer you? Enter their referral code below to help them earn rewards when you book!
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -111,7 +125,18 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
                         className="uppercase"
                         disabled={isLoading}
                     />
-                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <p className="text-sm text-red-700">{error}</p>
+                        </div>
+                    )}
+                    {code && !error && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <p className="text-sm text-blue-700">
+                                ℹ️ You'll be connected to the user with code: <strong>{code}</strong>
+                            </p>
+                        </div>
+                    )}
                 </div>
                 <div className="flex justify-end gap-4">
                     <Button variant="ghost" onClick={handleSkip} disabled={isLoading}>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
@@ -114,8 +115,17 @@ export default function DashboardPage() {
       setUser(userData);
       
       // Check if we should show the referral prompt
-      if (!userData.referred_by_code && !userData.has_seen_referral_prompt) {
-          setShowReferralPrompt(true);
+      // Show if: user doesn't have referred_by_code AND hasn't seen the prompt
+      if (!userData.referred_by_code && !userData.referral_prompt_seen) {
+          console.log('👀 Checking for stored referral code...');
+          const storedRefCode = localStorage.getItem('luxeliving_referral_code');
+          if (storedRefCode) {
+              console.log('📋 Found stored referral code, showing prompt');
+              setShowReferralPrompt(true);
+          } else {
+              console.log('ℹ️ No stored referral code found');
+              setShowReferralPrompt(false);
+          }
       } else {
           setShowReferralPrompt(false);
       }
@@ -124,6 +134,9 @@ export default function DashboardPage() {
       if (userData.referral_code) {
         const referralData = await base44.entities.Referral.filter({ referrer_email: userData.email });
         setReferrals(referralData);
+        
+        console.log('📊 Loading referral stats for user:', userData.email);
+        console.log('📋 Current referrals:', referralData);
         
         // Load aggregated referral statistics using base44.functions.invoke
         setIsLoadingReferralStats(true);

@@ -37,72 +37,117 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
         setError(null);
         
         try {
-            console.log('🔍 Validating referral code:', code);
+            console.log('═══════════════════════════════════════');
+            console.log('🚀 STARTING REFERRAL CODE APPLICATION');
+            console.log('═══════════════════════════════════════');
+            console.log('📋 Code entered:', code.trim().toUpperCase());
+            console.log('👤 Current user:', user.email);
             
-            // 1. Find the referrer by the code they entered
-            const referrers = await base44.entities.User.filter({ referral_code: code.trim().toUpperCase() });
+            // Step 1: Find the referrer by the code they entered
+            console.log('\n📡 Step 1: Looking up referrer...');
+            let referrers;
+            try {
+                referrers = await base44.entities.User.filter({ referral_code: code.trim().toUpperCase() });
+                console.log('✅ Query successful, found', referrers.length, 'users');
+            } catch (queryErr) {
+                console.error('❌ Query failed:', queryErr);
+                throw new Error(`Database query failed: ${queryErr.message}`);
+            }
             
             if (referrers.length === 0) {
+                console.log('⚠️ No user found with this referral code');
                 setError("This referral code is not valid. Please check and try again.");
                 setIsLoading(false);
                 return;
             }
             
             const referrer = referrers[0];
+            console.log('✅ Found referrer:', referrer.email);
+            console.log('   Referrer ID:', referrer.id);
             
-            // Prevent self-referral
+            // Step 2: Prevent self-referral
+            console.log('\n🔍 Step 2: Checking for self-referral...');
             if (referrer.email === user.email) {
+                console.log('❌ Self-referral detected!');
                 setError("You cannot use your own referral code!");
                 setIsLoading(false);
                 return;
             }
+            console.log('✅ Not a self-referral');
             
-            console.log('✅ Valid referrer found:', referrer.email);
+            // Step 3: Check if already referred
+            console.log('\n🔍 Step 3: Checking if user already has a referral code...');
+            if (user.referred_by_code) {
+                console.log('⚠️ User already has referred_by_code:', user.referred_by_code);
+                setError("You've already used a referral code!");
+                setIsLoading(false);
+                return;
+            }
+            console.log('✅ User has no existing referral code');
             
-            // 2. Update the current user's data
-            await base44.auth.updateMe({ 
-                referred_by_code: code.trim().toUpperCase(),
-                referral_prompt_seen: true  // Mark as seen to prevent showing again
-            });
+            // Step 4: Update current user
+            console.log('\n📝 Step 4: Updating current user with referral code...');
+            try {
+                await base44.auth.updateMe({ 
+                    referred_by_code: code.trim().toUpperCase(),
+                    referral_prompt_seen: true
+                });
+                console.log('✅ User updated successfully');
+            } catch (updateErr) {
+                console.error('❌ User update failed:', updateErr);
+                console.error('Update error details:', {
+                    message: updateErr.message,
+                    response: updateErr.response?.data,
+                    status: updateErr.response?.status
+                });
+                throw new Error(`Failed to update user: ${updateErr.message}`);
+            }
             
-            console.log('✅ User updated with referral code');
+            // Step 5: Create Referral record
+            console.log('\n📝 Step 5: Creating Referral record...');
+            try {
+                const referralData = {
+                    referrer_email: referrer.email,
+                    referred_email: user.email,
+                    status: 'signed_up'
+                };
+                console.log('Referral data:', referralData);
+                
+                await base44.entities.Referral.create(referralData);
+                console.log('✅ Referral record created successfully');
+            } catch (referralErr) {
+                console.error('❌ Referral creation failed:', referralErr);
+                console.error('Referral error details:', {
+                    message: referralErr.message,
+                    response: referralErr.response?.data
+                });
+                // Don't throw - user is already updated, this is secondary
+                console.log('⚠️ Continuing despite referral record error');
+            }
             
-            // 3. Create a new Referral record to track the relationship
-            await base44.entities.Referral.create({
-                referrer_email: referrer.email,
-                referred_email: user.email,
-                status: 'signed_up'
-            });
-            
-            console.log('✅ Referral record created');
-            
-            // 4. Clear the stored code from localStorage
+            // Step 6: Cleanup
+            console.log('\n🧹 Step 6: Cleaning up...');
             localStorage.removeItem('luxeliving_referral_code');
-            console.log('🧹 Cleared referral code from localStorage');
+            console.log('✅ Cleared referral code from localStorage');
+            
+            console.log('\n═══════════════════════════════════════');
+            console.log('🎉 REFERRAL CODE APPLICATION COMPLETE!');
+            console.log('═══════════════════════════════════════\n');
             
             alert('🎉 Referral code applied! Your referrer will earn rewards when you make your first booking!');
             
-            onSubmitted(); // This will close the dialog and reload data
+            onSubmitted();
             setOpen(false);
 
         } catch (err) {
-            console.error('❌ Error applying referral code:', err);
-            console.error('Error details:', {
-                message: err.message,
-                response: err.response?.data,
-                stack: err.stack
-            });
+            console.error('\n❌❌❌ CRITICAL ERROR ❌❌❌');
+            console.error('Error:', err);
+            console.error('Message:', err.message);
+            console.error('Stack:', err.stack);
+            console.error('Response:', err.response);
+            console.error('═══════════════════════════════════════\n');
             
-            // Provide specific error messages based on the error type
-            if (err.message?.includes('already exists') || err.message?.includes('duplicate')) {
-                setError("You've already used a referral code!");
-            } else if (err.message?.includes('not found') || err.response?.status === 404) {
-                setError("Invalid referral code. Please check and try again.");
-            } else if (err.message?.includes('permission') || err.response?.status === 403) {
-                setError("Permission denied. Please contact support.");
-            } else {
-                setError(`Error: ${err.message || 'An error occurred. Please try again.'}`);
-            }
+            setError(err.message || 'An error occurred. Please try again.');
         }
         setIsLoading(false);
     };

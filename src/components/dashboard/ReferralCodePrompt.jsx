@@ -87,7 +87,22 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
 
         } catch (err) {
             console.error('❌ Error applying referral code:', err);
-            setError("An error occurred. Please try again.");
+            console.error('Error details:', {
+                message: err.message,
+                response: err.response?.data,
+                stack: err.stack
+            });
+            
+            // Provide specific error messages based on the error type
+            if (err.message?.includes('already exists') || err.message?.includes('duplicate')) {
+                setError("You've already used a referral code!");
+            } else if (err.message?.includes('not found') || err.response?.status === 404) {
+                setError("Invalid referral code. Please check and try again.");
+            } else if (err.message?.includes('permission') || err.response?.status === 403) {
+                setError("Permission denied. Please contact support.");
+            } else {
+                setError(`Error: ${err.message || 'An error occurred. Please try again.'}`);
+            }
         }
         setIsLoading(false);
     };

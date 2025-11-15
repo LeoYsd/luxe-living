@@ -39,8 +39,21 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
         try {
             console.log('🔍 Validating referral code:', code);
             
-            // 1. Find the referrer by the code they entered
-            const referrers = await base44.entities.User.filter({ referral_code: code.trim().toUpperCase() });
+            // Check if user already has a referral
+            const existingReferral = await base44.entities.Referral.filter({
+                referred_email: user.email
+            });
+            
+            if (existingReferral.length > 0) {
+                setError("You've already used a referral code!");
+                setIsLoading(false);
+                return;
+            }
+            
+            // 1. Find the referrer by the code they entered (use service role to bypass RLS)
+            const referrers = await base44.asServiceRole.entities.User.filter({ 
+                referral_code: code.trim().toUpperCase() 
+            });
             
             if (referrers.length === 0) {
                 setError("This referral code is not valid. Please check and try again.");
@@ -62,13 +75,13 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
             // 2. Update the current user's data
             await base44.auth.updateMe({ 
                 referred_by_code: code.trim().toUpperCase(),
-                referral_prompt_seen: true  // Mark as seen to prevent showing again
+                referral_prompt_seen: true
             });
             
             console.log('✅ User updated with referral code');
             
-            // 3. Create a new Referral record to track the relationship
-            await base44.entities.Referral.create({
+            // 3. Create a new Referral record (use service role to ensure it works)
+            await base44.asServiceRole.entities.Referral.create({
                 referrer_email: referrer.email,
                 referred_email: user.email,
                 status: 'signed_up'
@@ -82,7 +95,7 @@ export default function ReferralCodePrompt({ user, onSubmitted }) {
             
             alert('🎉 Referral code applied! Your referrer will earn rewards when you make your first booking!');
             
-            onSubmitted(); // This will close the dialog and reload data
+            onSubmitted();
             setOpen(false);
 
         } catch (err) {

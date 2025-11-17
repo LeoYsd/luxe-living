@@ -16,7 +16,6 @@ export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
-  const [guests, setGuests] = useState(2);
   const [bedrooms, setBedrooms] = useState("any");
   const [user, setUser] = useState(null);
   const [wishlist, setWishlist] = useState([]);
@@ -45,11 +44,10 @@ export default function SearchPage() {
   };
   
   const handleSearch = async () => {
-    console.log('🔍 Search initiated:', { searchQuery, guests, bedrooms });
+    console.log('🔍 Search initiated:', { searchQuery, bedrooms });
     
     await search({
       location: searchQuery,
-      guests,
       bedrooms,
       propertyType: filters.propertyType,
       limit: 50

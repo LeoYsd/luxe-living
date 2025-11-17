@@ -17,7 +17,7 @@ import PaymentPage from './pages/PaymentPage';
 import BankAccounts from './pages/BankAccounts';
 import Withdrawals from './pages/Withdrawals';
 import ReferralTest from './pages/ReferralTest';
-import Layout from './Layout.jsx';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
@@ -45,5 +45,5 @@ export const PAGES = {
 export const pagesConfig = {
     mainPage: "Search",
     Pages: PAGES,
-    Layout: Layout,
+    Layout: __Layout,
 };

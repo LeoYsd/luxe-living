@@ -831,18 +831,7 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                <div>
-                  <Label>Number of Guests</Label>
-                  <Input
-                    type="number"
-                    value={bookingDetails.guests}
-                    onChange={(e) => setBookingDetails(prev => ({ ...prev, guests: parseInt(e.target.value) || 1 }))}
-                    min="1"
-                    max={property.max_guests}
-                    className="mt-1"
-                    disabled={isBooking || isCheckingAvailability || availabilityStatus === 'pending' || existingBooking}
-                  />
-                </div>
+
 
                 <div>
                   <Label>Special Requests</Label>

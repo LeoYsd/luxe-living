@@ -225,8 +225,6 @@ Return ONLY the JSON, no other text.
           setCheckIn={setCheckIn}
           checkOut={checkOut}
           setCheckOut={setCheckOut}
-          guests={guests}
-          setGuests={setGuests}
           bedrooms={bedrooms}
           setBedrooms={setBedrooms}
           onSearch={handleSearch}

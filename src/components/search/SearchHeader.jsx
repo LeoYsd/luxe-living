@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Calendar as CalendarIcon, Sparkles, SlidersHorizontal, Bed } from "lucide-react";
+import { MapPin, Calendar as CalendarIcon, Users, Sparkles, SlidersHorizontal, Bed } from "lucide-react";
 import { format } from "date-fns";
 
 export default function SearchHeader({ 
@@ -14,12 +14,19 @@ export default function SearchHeader({
   setCheckIn, 
   checkOut, 
   setCheckOut, 
+  guests, 
+  setGuests,
   bedrooms,
   setBedrooms,
   onSearch,
   onAIRecommendations,
   isLoadingAI 
 }) {
+  const guestOptions = [
+    ...Array.from({ length: 16 }, (_, i) => i + 1),
+    20, 25, 30, 35, 40, 45, 50, 51
+  ];
+
   const bedroomOptions = [
     { value: 'any', label: 'Any Bedrooms' },
     { value: 'studio', label: 'Studio' },
@@ -42,7 +49,7 @@ export default function SearchHeader({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="md:col-span-1">
             <div className="relative">
               <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -95,6 +102,24 @@ export default function SearchHeader({
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="md:col-span-1">
+            <Select value={guests.toString()} onValueChange={(value) => setGuests(parseInt(value))}>
+              <SelectTrigger className="h-14 rounded-xl border-slate-200 focus:border-amber-400">
+                <div className="flex items-center">
+                  <Users className="mr-3 h-5 w-5 text-slate-400" />
+                  <SelectValue placeholder="Guests" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="bg-white/95 backdrop-blur-xl max-h-60">
+                {guestOptions.map((num) => (
+                  <SelectItem key={num} value={num.toString()}>
+                    {num > 50 ? '50+ Guests' : `${num} ${num === 1 ? 'Guest' : 'Guests'}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="md:col-span-1">

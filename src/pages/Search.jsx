@@ -16,6 +16,7 @@ export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
+  const [guests, setGuests] = useState(2);
   const [bedrooms, setBedrooms] = useState("any");
   const [user, setUser] = useState(null);
   const [wishlist, setWishlist] = useState([]);
@@ -44,10 +45,11 @@ export default function SearchPage() {
   };
   
   const handleSearch = async () => {
-    console.log('🔍 Search initiated:', { searchQuery, bedrooms });
+    console.log('🔍 Search initiated:', { searchQuery, guests, bedrooms });
     
     await search({
       location: searchQuery,
+      guests,
       bedrooms,
       propertyType: filters.propertyType,
       limit: 50
@@ -225,6 +227,8 @@ Return ONLY the JSON, no other text.
           setCheckIn={setCheckIn}
           checkOut={checkOut}
           setCheckOut={setCheckOut}
+          guests={guests}
+          setGuests={setGuests}
           bedrooms={bedrooms}
           setBedrooms={setBedrooms}
           onSearch={handleSearch}

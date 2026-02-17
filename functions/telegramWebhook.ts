@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@base44/sdk@0.7.1';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 Deno.serve(async (req) => {
     console.log('=== TELEGRAM WEBHOOK CALLED ===');
@@ -113,11 +113,12 @@ Status: ${statusText} by admin`;
 
     } catch (error) {
         console.error('=== TELEGRAM WEBHOOK ERROR ===', error);
+        // Always return 200 OK to Telegram, even on errors
         return new Response(JSON.stringify({ 
-            ok: false, 
+            ok: true,
             error: error.message 
         }), {
-            status: 500,
+            status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
     }

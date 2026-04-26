@@ -18,6 +18,7 @@ Deno.serve(async (req) => {
             property_id,
             user_name,
             user_email,
+            user_mobile,
             check_in,
             check_out,
             guests,
@@ -64,6 +65,7 @@ Deno.serve(async (req) => {
 👤 Guest Details:
 • Name: ${user_name}
 • Email: ${user_email}
+• Mobile: ${user_mobile || 'Not provided'}
 • Guests: ${guests}
 
 📅 Requested Dates:

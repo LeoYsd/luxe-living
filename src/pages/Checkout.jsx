@@ -432,6 +432,7 @@ export default function CheckoutPage() {
           property_id: property.id,
           user_name: user.full_name || 'Guest User',
           user_email: user.email,
+          user_mobile: user.phone_number || 'Not provided',
           check_in: format(bookingDetails.checkIn, 'yyyy-MM-dd'),
           check_out: format(bookingDetails.checkOut, 'yyyy-MM-dd'),
           guests: bookingDetails.guests,

@@ -430,6 +430,7 @@ export default function CheckoutPage() {
           request_id: request.id,
           property_title: property.title,
           property_id: property.id,
+          property_location: property.location,
           user_name: user.full_name || 'Guest User',
           user_email: user.email,
           user_mobile: user.phone_number || 'Not provided',

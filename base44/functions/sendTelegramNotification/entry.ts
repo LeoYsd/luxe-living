@@ -16,6 +16,7 @@ Deno.serve(async (req) => {
             request_id,
             property_title,
             property_id,
+            property_location,
             user_name,
             user_email,
             user_mobile,
@@ -57,10 +58,15 @@ Deno.serve(async (req) => {
         const conflictEmoji = has_conflict ? '⚠️' : '✅';
         const conflictText = has_conflict ? 'CONFLICT DETECTED' : 'NO CONFLICTS';
 
+        const locationStr = property_location
+            ? [property_location.address, property_location.city, property_location.country].filter(Boolean).join(', ')
+            : 'Not provided';
+
         const message = `${conflictEmoji} AVAILABILITY CHECK REQUEST
 
 📍 Property: ${property_title}
 🆔 Property ID: ${property_id}
+📌 Location: ${locationStr}
 
 👤 Guest Details:
 • Name: ${user_name}

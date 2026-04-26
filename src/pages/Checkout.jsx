@@ -538,29 +538,31 @@ export default function CheckoutPage() {
   };
 
   useEffect(() => {
-    if (!availabilityRequestId || availabilityStatus !== 'pending' || existingBooking) {
+    if (!availabilityRequestId || existingBooking) {
       return;
     }
 
     console.log(`🔄 Starting polling for request: ${availabilityRequestId}`);
+    let stopped = false;
     
     const pollInterval = setInterval(async () => {
+      if (stopped) return;
       try {
         const request = await base44.entities.AvailabilityRequest.get(availabilityRequestId);
         
         if (request.status === 'approved') {
           console.log('✅ APPROVED');
+          stopped = true;
           clearInterval(pollInterval);
           setAvailabilityStatus('available');
           setAdminResponse(request.admin_response || 'Property is available for your dates!');
-          setAvailabilityRequestId(null);
           setIsCheckingAvailability(false);
         } else if (request.status === 'rejected') {
           console.log('❌ REJECTED');
+          stopped = true;
           clearInterval(pollInterval);
           setAvailabilityStatus('unavailable');
           setAdminResponse(request.admin_response || 'Property is not available for these dates.');
-          setAvailabilityRequestId(null);
           setIsCheckingAvailability(false);
         }
       } catch (error) {
@@ -568,8 +570,11 @@ export default function CheckoutPage() {
       }
     }, 3000);
 
-    return () => clearInterval(pollInterval);
-  }, [availabilityRequestId, availabilityStatus, existingBooking]);
+    return () => {
+      stopped = true;
+      clearInterval(pollInterval);
+    };
+  }, [availabilityRequestId, existingBooking]);
 
   useEffect(() => {
     if (bookingDetails.checkIn && bookingDetails.checkOut) {

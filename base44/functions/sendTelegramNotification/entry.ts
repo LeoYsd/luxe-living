@@ -35,6 +35,24 @@ Deno.serve(async (req) => {
             });
         }
 
+        // Fetch property to get photo
+        const appId = Deno.env.get('BASE44_APP_ID');
+        const apiKey = Deno.env.get('BASE44_SERVICE_ROLE_KEY');
+        let propertyImageUrl = null;
+        try {
+            const propRes = await fetch(`https://app.base44.com/api/apps/${appId}/entities/Property/${property_id}`, {
+                headers: { 'api_key': apiKey, 'Content-Type': 'application/json' }
+            });
+            if (propRes.ok) {
+                const prop = await propRes.json();
+                if (prop.images && prop.images.length > 0) {
+                    propertyImageUrl = prop.images[0];
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch property image:', e.message);
+        }
+
         const conflictEmoji = has_conflict ? '⚠️' : '✅';
         const conflictText = has_conflict ? 'CONFLICT DETECTED' : 'NO CONFLICTS';
 
@@ -56,27 +74,36 @@ ${conflictText}
 
 Request ID: ${request_id}`;
 
-        const telegramUrl = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
-        
+        const replyMarkup = {
+            inline_keyboard: [[
+                { text: '✅ Approve', callback_data: `approve_${request_id}` },
+                { text: '❌ Reject', callback_data: `reject_${request_id}` }
+            ]]
+        };
+
+        let telegramEndpoint, telegramBody;
+        if (propertyImageUrl) {
+            telegramEndpoint = `https://api.telegram.org/bot${telegramBotToken}/sendPhoto`;
+            telegramBody = {
+                chat_id: adminChatId,
+                photo: propertyImageUrl,
+                caption: message,
+                reply_markup: replyMarkup
+            };
+        } else {
+            telegramEndpoint = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+            telegramBody = {
+                chat_id: adminChatId,
+                text: message,
+                reply_markup: replyMarkup
+            };
+        }
+
+        const telegramUrl = telegramEndpoint;
         const telegramResponse = await fetch(telegramUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: adminChatId,
-                text: message,
-                reply_markup: {
-                    inline_keyboard: [[
-                        {
-                            text: '✅ Approve',
-                            callback_data: `approve_${request_id}`
-                        },
-                        {
-                            text: '❌ Reject',
-                            callback_data: `reject_${request_id}`
-                        }
-                    ]]
-                }
-            })
+            body: JSON.stringify(telegramBody)
         });
 
         const telegramData = await telegramResponse.json();
